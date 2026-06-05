@@ -1,0 +1,14 @@
+# NetBeans
+*.form
+nbproject/private/
+build/
+dist/
+
+# Compiled Java
+*.class
+*.jar
+*.war
+*.ear
+
+# VS Code
+.vscode/
