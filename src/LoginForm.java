@@ -21,7 +21,9 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicButtonUI;
 
 public class LoginForm extends JFrame {
 
@@ -31,19 +33,19 @@ public class LoginForm extends JFrame {
     private JPasswordField passwordField;
 
     // === WARNA DARI DESIGN ===
-    private static final Color GRADIENT_START = new Color(232, 130, 90);   // Oranye kiri
-    private static final Color GRADIENT_END   = new Color(190, 160, 130); // Coklat kanan
+    private static final Color GRADIENT_START = new Color(232, 130, 90);
+    private static final Color GRADIENT_END   = new Color(190, 160, 130);
     private static final Color CARD_BG        = Color.WHITE;
     private static final Color TEXT_COLOR     = new Color(50, 50, 50);
-    private static final Color ACCENT_COLOR   = new Color(232, 130, 90);  // Oranye untuk link
+    private static final Color ACCENT_COLOR   = new Color(232, 130, 90);
     private static final Color BUTTON_BG      = new Color(232, 130, 90);
     private static final Color FIELD_BORDER   = new Color(220, 220, 220);
     private static final Color PLACEHOLDER    = new Color(180, 180, 180);
 
-    private static final Dimension FRAME_SIZE = new Dimension(900, 600);
-    private static final Dimension CARD_SIZE  = new Dimension(380, 520);
-    private static final Dimension FIELD_SIZE = new Dimension(280, 38);
-    private static final Dimension BUTTON_SIZE = new Dimension(120, 38);
+    private static final Dimension FRAME_SIZE  = new Dimension(900, 600);
+    private static final Dimension CARD_SIZE   = new Dimension(380, 520);
+    private static final Dimension FIELD_SIZE  = new Dimension(280, 40);
+    private static final Dimension BUTTON_SIZE = new Dimension(120, 40);
 
     public LoginForm() {
         this(new com.mycompany.perpustakaan.api.LibraryApi());
@@ -51,6 +53,14 @@ public class LoginForm extends JFrame {
 
     public LoginForm(com.mycompany.perpustakaan.api.LibraryApi libraryApi) {
         this.libraryApi = libraryApi;
+        
+        // === FIX: Disable Nimbus interference ===
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            // fallback
+        }
+        
         initComponents();
     }
 
@@ -59,12 +69,10 @@ public class LoginForm extends JFrame {
         setTitle("Login Perpustakaan");
         setResizable(false);
 
-        // Root panel dengan gradient
         JPanel root = new GradientPanel();
         root.setLayout(new GridBagLayout());
         setContentPane(root);
 
-        // Card putih di tengah
         root.add(createLoginCard(), new GridBagConstraints());
 
         pack();
@@ -73,22 +81,27 @@ public class LoginForm extends JFrame {
     }
 
     private JPanel createLoginCard() {
-        JPanel card = new JPanel(new GridBagLayout());
+        JPanel card = new JPanel(new GridBagLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Shadow
+                g2d.setColor(new Color(0, 0, 0, 30));
+                g2d.fillRoundRect(4, 4, getWidth() - 4, getHeight() - 4, 20, 20);
+                
+                // Card body
+                g2d.setColor(CARD_BG);
+                g2d.fillRoundRect(0, 0, getWidth() - 4, getHeight() - 4, 20, 20);
+                
+                g2d.dispose();
+            }
+        };
         card.setPreferredSize(CARD_SIZE);
-        card.setBackground(CARD_BG);
-        card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(230, 230, 230), 1),
-            new EmptyBorder(20, 40, 30, 40)
-        ));
-
-        // Shadow effect (simulasi sederhana)
-        card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createEmptyBorder(0, 0, 4, 4), // "shadow" offset
-            BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(0, 0, 0, 20), 1),
-                new EmptyBorder(20, 40, 30, 40)
-            )
-        ));
+        card.setOpaque(false); // Penting! biar paintComponent jalan
+        card.setBorder(new EmptyBorder(20, 40, 30, 40));
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridx = 0;
@@ -103,7 +116,6 @@ public class LoginForm extends JFrame {
             ImageIcon icon = new ImageIcon(getClass().getResource("/logo3.png"));
             logo.setIcon(icon);
         } catch (Exception e) {
-            // Fallback kalau logo gak ketemu
             logo.setText("📚 LIBRARY HUB");
             logo.setFont(new Font("Segoe UI", Font.BOLD, 16));
             logo.setForeground(new Color(139, 90, 43));
@@ -111,7 +123,7 @@ public class LoginForm extends JFrame {
         logo.setHorizontalAlignment(SwingConstants.CENTER);
         card.add(logo, gbc);
 
-        // === TITLE "Masuk" ===
+        // === TITLE ===
         gbc.gridy = 1;
         gbc.insets = new Insets(0, 0, 25, 0);
         JLabel title = new JLabel("Masuk");
@@ -120,13 +132,12 @@ public class LoginForm extends JFrame {
         title.setHorizontalAlignment(SwingConstants.CENTER);
         card.add(title, gbc);
 
-        // === USERNAME LABEL ===
+        // === USERNAME ===
         gbc.gridy = 2;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.insets = new Insets(0, 0, 8, 0);
         card.add(createLabel("Username  :"), gbc);
 
-        // === USERNAME FIELD ===
         usernameField = createStyledField("Ketik Di Sini");
         usernameField.addActionListener(e -> passwordField.requestFocusInWindow());
         gbc.gridy = 3;
@@ -134,13 +145,12 @@ public class LoginForm extends JFrame {
         gbc.insets = new Insets(0, 0, 18, 0);
         card.add(usernameField, gbc);
 
-        // === PASSWORD LABEL ===
+        // === PASSWORD ===
         gbc.gridy = 4;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.insets = new Insets(0, 0, 8, 0);
         card.add(createLabel("Password  :"), gbc);
 
-        // === PASSWORD FIELD ===
         passwordField = createStyledPasswordField("Ketik Di Sini");
         passwordField.addActionListener(this::loginActionPerformed);
         gbc.gridy = 5;
@@ -149,20 +159,13 @@ public class LoginForm extends JFrame {
         card.add(passwordField, gbc);
 
         // === LOGIN BUTTON ===
-        JButton loginButton = new JButton("Login");
-        loginButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        loginButton.setForeground(Color.WHITE);
-        loginButton.setBackground(BUTTON_BG);
-        loginButton.setFocusPainted(false);
-        loginButton.setBorderPainted(false);
-        loginButton.setPreferredSize(BUTTON_SIZE);
-        loginButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        JButton loginButton = createStyledButton("Login");
         loginButton.addActionListener(this::loginActionPerformed);
         gbc.gridy = 6;
         gbc.insets = new Insets(0, 0, 20, 0);
         card.add(loginButton, gbc);
 
-        // === FOOTER: "Belum punya akun? Daftar di sini" ===
+        // === FOOTER ===
         JPanel footer = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 5, 0));
         footer.setOpaque(false);
 
@@ -179,12 +182,10 @@ public class LoginForm extends JFrame {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 openSignUp();
             }
-
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
                 linkLabel.setText("<html><u>Daftar di sini</u></html>");
             }
-
             @Override
             public void mouseExited(java.awt.event.MouseEvent e) {
                 linkLabel.setText("Daftar di sini");
@@ -201,7 +202,6 @@ public class LoginForm extends JFrame {
         return card;
     }
 
-    // === HELPER: Buat label biasa ===
     private JLabel createLabel(String text) {
         JLabel label = new JLabel(text);
         label.setFont(new Font("Segoe UI", Font.BOLD, 13));
@@ -209,25 +209,38 @@ public class LoginForm extends JFrame {
         return label;
     }
 
-    // === HELPER: Styled TextField (rounded + shadow + placeholder) ===
+    // === STYLED TEXTFIELD (Rounded + Shadow + Placeholder) ===
     private JTextField createStyledField(String placeholder) {
-        JTextField field = new JTextField();
+        JTextField field = new JTextField() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Shadow
+                g2d.setColor(new Color(0, 0, 0, 20));
+                g2d.fillRoundRect(2, 2, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                // Background
+                g2d.setColor(getBackground());
+                g2d.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                // Border
+                g2d.setColor(FIELD_BORDER);
+                g2d.drawRoundRect(0, 0, getWidth() - 3, getHeight() - 3, 12, 12);
+                
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        
         field.setPreferredSize(FIELD_SIZE);
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        field.setForeground(TEXT_COLOR);
-        field.setBackground(Color.WHITE);
-        field.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(FIELD_BORDER, 1),
-            new EmptyBorder(5, 12, 5, 12)
-        ));
-
-        // Rounded corners pakai custom border
-        field.setBorder(new RoundedBorder(8, FIELD_BORDER));
-
-        // Placeholder logic
-        field.setText(placeholder);
-        field.setForeground(PLACEHOLDER);
         field.setFont(new Font("Segoe UI", Font.ITALIC, 13));
+        field.setForeground(PLACEHOLDER);
+        field.setBackground(Color.WHITE);
+        field.setOpaque(false); // Penting! biar paintComponent jalan
+        field.setBorder(new EmptyBorder(8, 14, 8, 14));
+        field.setText(placeholder);
 
         field.addFocusListener(new FocusListener() {
             @Override
@@ -238,7 +251,6 @@ public class LoginForm extends JFrame {
                     field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
                 }
             }
-
             @Override
             public void focusLost(FocusEvent e) {
                 if (field.getText().isEmpty()) {
@@ -252,19 +264,39 @@ public class LoginForm extends JFrame {
         return field;
     }
 
-    // === HELPER: Styled PasswordField ===
+    // === STYLED PASSWORD FIELD ===
     private JPasswordField createStyledPasswordField(String placeholder) {
-        JPasswordField field = new JPasswordField();
+        JPasswordField field = new JPasswordField() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Shadow
+                g2d.setColor(new Color(0, 0, 0, 20));
+                g2d.fillRoundRect(2, 2, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                // Background
+                g2d.setColor(getBackground());
+                g2d.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                // Border
+                g2d.setColor(FIELD_BORDER);
+                g2d.drawRoundRect(0, 0, getWidth() - 3, getHeight() - 3, 12, 12);
+                
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        
         field.setPreferredSize(FIELD_SIZE);
-        field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        field.setForeground(TEXT_COLOR);
-        field.setBackground(Color.WHITE);
-        field.setBorder(new RoundedBorder(8, FIELD_BORDER));
-        field.setEchoChar((char) 0); // Tampilkan text dulu untuk placeholder
-
-        field.setText(placeholder);
-        field.setForeground(PLACEHOLDER);
         field.setFont(new Font("Segoe UI", Font.ITALIC, 13));
+        field.setForeground(PLACEHOLDER);
+        field.setBackground(Color.WHITE);
+        field.setOpaque(false);
+        field.setBorder(new EmptyBorder(8, 14, 8, 14));
+        field.setEchoChar((char) 0);
+        field.setText(placeholder);
 
         field.addFocusListener(new FocusListener() {
             @Override
@@ -274,10 +306,9 @@ public class LoginForm extends JFrame {
                     field.setText("");
                     field.setForeground(TEXT_COLOR);
                     field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    field.setEchoChar('•'); // Password dot
+                    field.setEchoChar('•');
                 }
             }
-
             @Override
             public void focusLost(FocusEvent e) {
                 String current = new String(field.getPassword());
@@ -285,7 +316,7 @@ public class LoginForm extends JFrame {
                     field.setText(placeholder);
                     field.setForeground(PLACEHOLDER);
                     field.setFont(new Font("Segoe UI", Font.ITALIC, 13));
-                    field.setEchoChar((char) 0); // Tampilkan text lagi
+                    field.setEchoChar((char) 0);
                 }
             }
         });
@@ -293,37 +324,52 @@ public class LoginForm extends JFrame {
         return field;
     }
 
-    // === CUSTOM ROUNDED BORDER ===
-    private static class RoundedBorder implements javax.swing.border.Border {
-        private int radius;
-        private Color color;
-
-        RoundedBorder(int radius, Color color) {
-            this.radius = radius;
-            this.color = color;
-        }
-
-        @Override
-        public void paintBorder(java.awt.Component c, Graphics g, int x, int y, int width, int height) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(color);
-            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
-            g2.dispose();
-        }
-
-        @Override
-        public java.awt.Insets getBorderInsets(java.awt.Component c) {
-            return new java.awt.Insets(radius / 2 + 2, radius + 5, radius / 2 + 2, radius + 5);
-        }
-
-        @Override
-        public boolean isBorderOpaque() {
-            return false;
-        }
+    // === STYLED BUTTON (Rounded + Flat) ===
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Shadow
+                g2d.setColor(new Color(0, 0, 0, 30));
+                g2d.fillRoundRect(2, 2, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                // Button body
+                if (getModel().isPressed()) {
+                    g2d.setColor(BUTTON_BG.darker());
+                } else if (getModel().isRollover()) {
+                    g2d.setColor(BUTTON_BG.brighter());
+                } else {
+                    g2d.setColor(BUTTON_BG);
+                }
+                g2d.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                // Text
+                g2d.setColor(Color.WHITE);
+                g2d.setFont(getFont());
+                java.awt.FontMetrics fm = g2d.getFontMetrics();
+                int textX = (getWidth() - fm.stringWidth(getText())) / 2;
+                int textY = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2d.drawString(getText(), textX, textY);
+                
+                g2d.dispose();
+            }
+        };
+        
+        button.setPreferredSize(BUTTON_SIZE);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false); // Penting! disable default button paint
+        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        
+        return button;
     }
 
-    // === GRADIENT BACKGROUND PANEL ===
+    // === GRADIENT BACKGROUND ===
     private static class GradientPanel extends JPanel {
         @Override
         protected void paintComponent(Graphics g) {
@@ -338,7 +384,6 @@ public class LoginForm extends JFrame {
     }
 
     private void loginActionPerformed(java.awt.event.ActionEvent event) {
-        // Ambil value, skip kalau masih placeholder
         String username = usernameField.getText().equals("Ketik Di Sini") ? "" : usernameField.getText();
         String password = new String(passwordField.getPassword()).equals("Ketik Di Sini") ? "" : new String(passwordField.getPassword());
 
@@ -348,7 +393,6 @@ public class LoginForm extends JFrame {
                 JOptionPane.showMessageDialog(this, response.getMessage(), "Login gagal", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-
             new Dashboard(libraryApi).setVisible(true);
             dispose();
         } catch (SQLException exception) {
@@ -365,17 +409,6 @@ public class LoginForm extends JFrame {
     }
 
     public static void main(String args[]) {
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ReflectiveOperationException | javax.swing.UnsupportedLookAndFeelException ex) {
-            logger.log(java.util.logging.Level.SEVERE, null, ex);
-        }
-
         java.awt.EventQueue.invokeLater(() -> new LoginForm().setVisible(true));
     }
 }

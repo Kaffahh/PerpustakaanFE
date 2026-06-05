@@ -19,6 +19,7 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
+import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
 
 public class SignUp extends JFrame {
@@ -29,7 +30,6 @@ public class SignUp extends JFrame {
     private JPasswordField passwordField;
     private JPasswordField confirmPasswordField;
 
-    // === WARNA DARI DESIGN ===
     private static final Color GRADIENT_START = new Color(232, 130, 90);
     private static final Color GRADIENT_END   = new Color(190, 160, 130);
     private static final Color CARD_BG        = Color.WHITE;
@@ -38,10 +38,10 @@ public class SignUp extends JFrame {
     private static final Color FIELD_BORDER   = new Color(220, 220, 220);
     private static final Color PLACEHOLDER    = new Color(180, 180, 180);
 
-    private static final Dimension FRAME_SIZE = new Dimension(900, 600);
-    private static final Dimension CARD_SIZE  = new Dimension(380, 480);
-    private static final Dimension FIELD_SIZE = new Dimension(280, 38);
-    private static final Dimension BUTTON_SIZE = new Dimension(120, 38);
+    private static final Dimension FRAME_SIZE  = new Dimension(900, 600);
+    private static final Dimension CARD_SIZE   = new Dimension(380, 480);
+    private static final Dimension FIELD_SIZE  = new Dimension(280, 40);
+    private static final Dimension BUTTON_SIZE = new Dimension(120, 40);
 
     public SignUp() {
         this(new com.mycompany.perpustakaan.api.LibraryApi());
@@ -49,6 +49,14 @@ public class SignUp extends JFrame {
 
     public SignUp(com.mycompany.perpustakaan.api.LibraryApi libraryApi) {
         this.libraryApi = libraryApi;
+        
+        // === FIX: Disable Nimbus interference ===
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            // fallback
+        }
+        
         initComponents();
     }
 
@@ -69,23 +77,34 @@ public class SignUp extends JFrame {
     }
 
     private JPanel createRegisterCard() {
-        JPanel card = new JPanel(new GridBagLayout());
+        JPanel card = new JPanel(new GridBagLayout()) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Shadow
+                g2d.setColor(new Color(0, 0, 0, 30));
+                g2d.fillRoundRect(4, 4, getWidth() - 4, getHeight() - 4, 20, 20);
+                
+                // Card body
+                g2d.setColor(CARD_BG);
+                g2d.fillRoundRect(0, 0, getWidth() - 4, getHeight() - 4, 20, 20);
+                
+                g2d.dispose();
+            }
+        };
         card.setPreferredSize(CARD_SIZE);
-        card.setBackground(CARD_BG);
-        card.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createEmptyBorder(0, 0, 4, 4),
-            BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(0, 0, 0, 20), 1),
-                new EmptyBorder(30, 40, 40, 40)
-            )
-        ));
+        card.setOpaque(false);
+        card.setBorder(new EmptyBorder(30, 40, 40, 40));
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.gridx = 0;
         gbc.fill = GridBagConstraints.NONE;
         gbc.anchor = GridBagConstraints.CENTER;
 
-        // === TITLE "Daftar" ===
+        // === TITLE ===
         gbc.gridy = 0;
         gbc.insets = new Insets(0, 0, 30, 0);
         JLabel title = new JLabel("Daftar");
@@ -94,24 +113,13 @@ public class SignUp extends JFrame {
         title.setHorizontalAlignment(SwingConstants.CENTER);
         card.add(title, gbc);
 
-        // === USERNAME ===
+        // === FIELDS ===
         usernameField = addField(card, gbc, 1, "Username  :", false);
-
-        // === PASSWORD ===
         passwordField = (JPasswordField) addField(card, gbc, 3, "Password  :", true);
-
-        // === KONFIRMASI ===
         confirmPasswordField = (JPasswordField) addField(card, gbc, 5, "Konfirmasi :", true);
 
-        // === BUTTON DAFTAR ===
-        JButton registerButton = new JButton("Daftar");
-        registerButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        registerButton.setForeground(Color.WHITE);
-        registerButton.setBackground(BUTTON_BG);
-        registerButton.setFocusPainted(false);
-        registerButton.setBorderPainted(false);
-        registerButton.setPreferredSize(BUTTON_SIZE);
-        registerButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        // === BUTTON ===
+        JButton registerButton = createStyledButton("Daftar");
         registerButton.addActionListener(this::registerActionPerformed);
         gbc.gridy = 7;
         gbc.anchor = GridBagConstraints.CENTER;
@@ -122,7 +130,6 @@ public class SignUp extends JFrame {
     }
 
     private JTextField addField(JPanel card, GridBagConstraints gbc, int row, String labelText, boolean password) {
-        // Label
         gbc.gridy = row;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.insets = new Insets(0, 0, 6, 0);
@@ -131,7 +138,6 @@ public class SignUp extends JFrame {
         label.setForeground(TEXT_COLOR);
         card.add(label, gbc);
 
-        // Field
         JTextField field;
         if (password) {
             field = createStyledPasswordField("Ketik Di Sini");
@@ -147,14 +153,34 @@ public class SignUp extends JFrame {
         return field;
     }
 
-    // === HELPER: Styled TextField ===
+    // === STYLED TEXTFIELD ===
     private JTextField createStyledField(String placeholder) {
-        JTextField field = new JTextField();
+        JTextField field = new JTextField() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                g2d.setColor(new Color(0, 0, 0, 20));
+                g2d.fillRoundRect(2, 2, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                g2d.setColor(getBackground());
+                g2d.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                g2d.setColor(FIELD_BORDER);
+                g2d.drawRoundRect(0, 0, getWidth() - 3, getHeight() - 3, 12, 12);
+                
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        
         field.setPreferredSize(FIELD_SIZE);
         field.setFont(new Font("Segoe UI", Font.ITALIC, 13));
         field.setForeground(PLACEHOLDER);
         field.setBackground(Color.WHITE);
-        field.setBorder(new RoundedBorder(8, FIELD_BORDER));
+        field.setOpaque(false);
+        field.setBorder(new EmptyBorder(8, 14, 8, 14));
         field.setText(placeholder);
 
         field.addFocusListener(new FocusListener() {
@@ -166,7 +192,6 @@ public class SignUp extends JFrame {
                     field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
                 }
             }
-
             @Override
             public void focusLost(FocusEvent e) {
                 if (field.getText().isEmpty()) {
@@ -180,14 +205,34 @@ public class SignUp extends JFrame {
         return field;
     }
 
-    // === HELPER: Styled PasswordField ===
+    // === STYLED PASSWORD FIELD ===
     private JPasswordField createStyledPasswordField(String placeholder) {
-        JPasswordField field = new JPasswordField();
+        JPasswordField field = new JPasswordField() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                g2d.setColor(new Color(0, 0, 0, 20));
+                g2d.fillRoundRect(2, 2, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                g2d.setColor(getBackground());
+                g2d.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                g2d.setColor(FIELD_BORDER);
+                g2d.drawRoundRect(0, 0, getWidth() - 3, getHeight() - 3, 12, 12);
+                
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        
         field.setPreferredSize(FIELD_SIZE);
         field.setFont(new Font("Segoe UI", Font.ITALIC, 13));
         field.setForeground(PLACEHOLDER);
         field.setBackground(Color.WHITE);
-        field.setBorder(new RoundedBorder(8, FIELD_BORDER));
+        field.setOpaque(false);
+        field.setBorder(new EmptyBorder(8, 14, 8, 14));
         field.setEchoChar((char) 0);
         field.setText(placeholder);
 
@@ -202,7 +247,6 @@ public class SignUp extends JFrame {
                     field.setEchoChar('•');
                 }
             }
-
             @Override
             public void focusLost(FocusEvent e) {
                 String current = new String(field.getPassword());
@@ -218,34 +262,46 @@ public class SignUp extends JFrame {
         return field;
     }
 
-    // === CUSTOM ROUNDED BORDER ===
-    private static class RoundedBorder implements javax.swing.border.Border {
-        private int radius;
-        private Color color;
-
-        RoundedBorder(int radius, Color color) {
-            this.radius = radius;
-            this.color = color;
-        }
-
-        @Override
-        public void paintBorder(java.awt.Component c, Graphics g, int x, int y, int width, int height) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(color);
-            g2.drawRoundRect(x, y, width - 1, height - 1, radius, radius);
-            g2.dispose();
-        }
-
-        @Override
-        public java.awt.Insets getBorderInsets(java.awt.Component c) {
-            return new java.awt.Insets(radius / 2 + 2, radius + 5, radius / 2 + 2, radius + 5);
-        }
-
-        @Override
-        public boolean isBorderOpaque() {
-            return false;
-        }
+    // === STYLED BUTTON ===
+    private JButton createStyledButton(String text) {
+        JButton button = new JButton(text) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                g2d.setColor(new Color(0, 0, 0, 30));
+                g2d.fillRoundRect(2, 2, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                if (getModel().isPressed()) {
+                    g2d.setColor(BUTTON_BG.darker());
+                } else if (getModel().isRollover()) {
+                    g2d.setColor(BUTTON_BG.brighter());
+                } else {
+                    g2d.setColor(BUTTON_BG);
+                }
+                g2d.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, 12, 12);
+                
+                g2d.setColor(Color.WHITE);
+                g2d.setFont(getFont());
+                java.awt.FontMetrics fm = g2d.getFontMetrics();
+                int textX = (getWidth() - fm.stringWidth(getText())) / 2;
+                int textY = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2d.drawString(getText(), textX, textY);
+                
+                g2d.dispose();
+            }
+        };
+        
+        button.setPreferredSize(BUTTON_SIZE);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setContentAreaFilled(false);
+        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        
+        return button;
     }
 
     // === GRADIENT PANEL ===
@@ -263,7 +319,6 @@ public class SignUp extends JFrame {
     }
 
     private void registerActionPerformed(java.awt.event.ActionEvent event) {
-        // Ambil value, skip placeholder
         String username = usernameField.getText().equals("Ketik Di Sini") ? "" : usernameField.getText();
         String password = new String(passwordField.getPassword()).equals("Ketik Di Sini") ? "" : new String(passwordField.getPassword());
         String confirmPassword = new String(confirmPasswordField.getPassword()).equals("Ketik Di Sini") ? "" : new String(confirmPasswordField.getPassword());
@@ -297,17 +352,6 @@ public class SignUp extends JFrame {
     }
 
     public static void main(String args[]) {
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ReflectiveOperationException | javax.swing.UnsupportedLookAndFeelException ex) {
-            logger.log(java.util.logging.Level.SEVERE, null, ex);
-        }
-
         java.awt.EventQueue.invokeLater(() -> new SignUp().setVisible(true));
     }
 }
