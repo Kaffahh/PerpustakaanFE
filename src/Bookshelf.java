@@ -12,6 +12,8 @@ import java.awt.GridBagLayout;
 import java.awt.Image;
 import java.awt.Insets;
 import java.awt.RenderingHints;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.sql.SQLException;
@@ -21,29 +23,31 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
 
-public class Dashboard extends JFrame {
+public class Bookshelf extends JFrame {
 
-    private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(Dashboard.class.getName());
+    private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(Bookshelf.class.getName());
     private final com.mycompany.perpustakaan.api.LibraryApi libraryApi;
 
     // === WARNA ===
     private static final Color BG_APP        = new Color(245, 245, 245);
     private static final Color WHITE         = Color.WHITE;
-    private static final Color ACCENT        = new Color(232, 130, 90);   // Oranye
-    private static final Color ACCENT_DARK   = new Color(196, 149, 94);   // Coklat muda
+    private static final Color ACCENT        = new Color(232, 130, 90);
+    private static final Color ACCENT_DARK   = new Color(196, 149, 94);
     private static final Color TEXT_DARK     = new Color(50, 50, 50);
     private static final Color TEXT_GRAY     = new Color(120, 120, 120);
     private static final Color BORDER_COLOR  = new Color(224, 224, 224);
+    private static final Color SEARCH_BG     = new Color(230, 230, 230);
     private static final Color GREEN_STATUS  = new Color(0, 200, 83);
     private static final Color RED_STATUS    = new Color(255, 23, 68);
 
@@ -52,34 +56,30 @@ public class Dashboard extends JFrame {
     private static final Dimension HEADER_SIZE   = new Dimension(1060, 80);
     private static final Dimension CARD_SIZE     = new Dimension(160, 240);
 
-    // Menu buttons
-    private SidebarButton btnDashboard, btnBookshelf, btnLoan, btnProfile, btnHistory;
     private SidebarButton activeButton;
-
-    // Content
     private JPanel contentPanel;
-    private JLabel welcomeLabel, roleLabel;
+    private JTextField searchField;
+    private JComboBox<String> categoryFilter;
+    private String currentKeyword = "";
+    private String currentCategory = "Semua kategori";
 
-    public Dashboard() {
+    public Bookshelf() {
         this(new com.mycompany.perpustakaan.api.LibraryApi());
     }
 
-    public Dashboard(com.mycompany.perpustakaan.api.LibraryApi libraryApi) {
+    public Bookshelf(com.mycompany.perpustakaan.api.LibraryApi libraryApi) {
         this.libraryApi = libraryApi;
         
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            // fallback
-        }
+        } catch (Exception e) {}
         
         initComponents();
-        loadUserData();
     }
 
     private void initComponents() {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setTitle("Dashboard Perpustakaan");
+        setTitle("Bookshelf Perpustakaan");
         setSize(FRAME_SIZE);
         setMinimumSize(FRAME_SIZE);
         setLocationRelativeTo(null);
@@ -112,12 +112,12 @@ public class Dashboard extends JFrame {
         contentScroll.setBorder(null);
         contentScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         contentScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        mainArea.add(contentScroll, BorderLayout.CENTER);
 
+        mainArea.add(contentScroll, BorderLayout.CENTER);
         root.add(mainArea, BorderLayout.CENTER);
 
-        // Load default content
-        showDashboard();
+        // Load content
+        loadBookshelf();
     }
 
     // ============================================================
@@ -130,7 +130,6 @@ public class Dashboard extends JFrame {
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, BORDER_COLOR));
 
-            // Logo
             JLabel logo = new JLabel();
             try {
                 logo.setIcon(new ImageIcon(getClass().getResource("/logo3.png")));
@@ -143,45 +142,33 @@ public class Dashboard extends JFrame {
             logo.setBorder(new EmptyBorder(20, 0, 10, 0));
             add(logo);
 
-            // Menu title
             JLabel menuTitle = new JLabel("Menu");
             menuTitle.setFont(new Font("Segoe UI", Font.BOLD, 16));
             menuTitle.setForeground(TEXT_DARK);
             menuTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
             menuTitle.setBorder(new EmptyBorder(10, 0, 10, 0));
             add(menuTitle);
-
             add(Box.createVerticalStrut(10));
 
-            // Menu buttons
-            btnDashboard = new SidebarButton("Dashboard", "/icon-dashboard.png");
-            btnBookshelf = new SidebarButton("Bookshelf", "/icon-bookshelf.png");
-            btnLoan      = new SidebarButton("Loan Page", "/icon-loan.png");
-            btnProfile   = new SidebarButton("User Profile", "/icon-profile.png");
-            btnHistory   = new SidebarButton("History", "/icon-history.png");
+            SidebarButton btnDashboard = new SidebarButton("Dashboard", "/icon-dashboard.png");
+            SidebarButton btnBookshelf = new SidebarButton("Bookshelf", "/icon-bookshelf.png");
+            SidebarButton btnLoan      = new SidebarButton("Loan Page", "/icon-loan.png");
+            SidebarButton btnProfile   = new SidebarButton("User Profile", "/icon-profile.png");
+            SidebarButton btnHistory   = new SidebarButton("History", "/icon-history.png");
 
-            btnDashboard.addActionListener(e -> { setActive(btnDashboard); showDashboard(); });
-            btnBookshelf.addActionListener(e -> { 
-                setActive(btnBookshelf); 
-                new Bookshelf(libraryApi).setVisible(true);
-                dispose();
-            });
-            btnLoan.addActionListener(e -> { setActive(btnLoan); showLoans(); });
-            btnProfile.addActionListener(e -> { setActive(btnProfile); showProfile(); });
-            btnHistory.addActionListener(e -> { setActive(btnHistory); showHistory(); });
+            btnDashboard.addActionListener(e -> { setActive(btnDashboard); openDashboard(); });
+            btnBookshelf.addActionListener(e -> { setActive(btnBookshelf); });
+            btnLoan.addActionListener(e -> { setActive(btnLoan); });
+            btnProfile.addActionListener(e -> { setActive(btnProfile); });
+            btnHistory.addActionListener(e -> { setActive(btnHistory); });
 
-            add(btnDashboard);
-            add(Box.createVerticalStrut(8));
-            add(btnBookshelf);
-            add(Box.createVerticalStrut(8));
-            add(btnLoan);
-            add(Box.createVerticalStrut(8));
-            add(btnProfile);
-            add(Box.createVerticalStrut(8));
+            add(btnDashboard); add(Box.createVerticalStrut(8));
+            add(btnBookshelf); add(Box.createVerticalStrut(8));
+            add(btnLoan);      add(Box.createVerticalStrut(8));
+            add(btnProfile);   add(Box.createVerticalStrut(8));
             add(btnHistory);
 
-            setActive(btnDashboard); // Default active
-
+            setActive(btnBookshelf);
             add(Box.createVerticalGlue());
         }
     }
@@ -207,15 +194,11 @@ public class Dashboard extends JFrame {
             addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseEntered(MouseEvent e) {
-                    if (SidebarButton.this != activeButton) {
-                        setBackground(new Color(250, 250, 250));
-                    }
+                    if (SidebarButton.this != activeButton) setBackground(new Color(250, 250, 250));
                 }
                 @Override
                 public void mouseExited(MouseEvent e) {
-                    if (SidebarButton.this != activeButton) {
-                        setBackground(WHITE);
-                    }
+                    if (SidebarButton.this != activeButton) setBackground(WHITE);
                 }
             });
         }
@@ -224,7 +207,6 @@ public class Dashboard extends JFrame {
         protected void paintComponent(Graphics g) {
             Graphics2D g2d = (Graphics2D) g.create();
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
             if (this == activeButton) {
                 GradientPaint gp = new GradientPaint(0, 0, ACCENT, getWidth(), getHeight(), ACCENT_DARK);
                 g2d.setPaint(gp);
@@ -235,7 +217,6 @@ public class Dashboard extends JFrame {
                 g2d.fillRoundRect(5, 2, getWidth() - 10, getHeight() - 4, 12, 12);
                 setForeground(TEXT_DARK);
             }
-
             g2d.dispose();
             super.paintComponent(g);
         }
@@ -254,9 +235,7 @@ public class Dashboard extends JFrame {
     }
 
     private void setActive(SidebarButton button) {
-        if (activeButton != null) {
-            activeButton.repaint();
-        }
+        if (activeButton != null) activeButton.repaint();
         activeButton = button;
         activeButton.repaint();
     }
@@ -274,7 +253,7 @@ public class Dashboard extends JFrame {
                 new EmptyBorder(15, 25, 15, 25)
             ));
 
-            // Left: Profile + Welcome
+            // Left: Profile
             JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
             left.setOpaque(false);
 
@@ -292,11 +271,11 @@ public class Dashboard extends JFrame {
             textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
             textPanel.setOpaque(false);
 
-            welcomeLabel = new JLabel("WELCOME, USER");
+            JLabel welcomeLabel = new JLabel("WELCOME, USER");
             welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 16));
             welcomeLabel.setForeground(TEXT_DARK);
 
-            roleLabel = new JLabel("USER");
+            JLabel roleLabel = new JLabel("USER");
             roleLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
             roleLabel.setForeground(ACCENT);
 
@@ -315,12 +294,6 @@ public class Dashboard extends JFrame {
                 notif.setFont(new Font("Segoe UI", Font.PLAIN, 24));
             }
             notif.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-            notif.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    JOptionPane.showMessageDialog(Dashboard.this, "Tidak ada notifikasi baru.", "Notifikasi", JOptionPane.INFORMATION_MESSAGE);
-                }
-            });
 
             add(left, BorderLayout.WEST);
             add(notif, BorderLayout.EAST);
@@ -328,48 +301,205 @@ public class Dashboard extends JFrame {
     }
 
     // ============================================================
+    // SEARCH BAR
+    // ============================================================
+    private JPanel createSearchBar() {
+        if (System.currentTimeMillis() >= 0) {
+            return createSearchControls();
+        }
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        searchPanel.setOpaque(false);
+        searchPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        searchPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
+
+        searchField = new JTextField("What Do You Think?") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setColor(SEARCH_BG);
+                g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 25, 25);
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        searchField.setPreferredSize(new Dimension(400, 45));
+        searchField.setFont(new Font("Segoe UI", Font.ITALIC, 14));
+        searchField.setForeground(TEXT_GRAY);
+        searchField.setOpaque(false);
+        searchField.setBorder(new EmptyBorder(10, 45, 10, 20));
+
+        // Icon search
+        JLabel searchIcon = new JLabel("🔍");
+        searchIcon.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+        searchIcon.setBounds(15, 10, 25, 25);
+
+        JPanel searchWrapper = new JPanel(null);
+        searchWrapper.setOpaque(false);
+        searchWrapper.setPreferredSize(new Dimension(420, 50));
+        searchWrapper.add(searchIcon);
+        searchWrapper.add(searchField);
+        searchField.setBounds(0, 0, 400, 45);
+
+        searchField.addFocusListener(new FocusListener() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (searchField.getText().equals("What Do You Think?")) {
+                    searchField.setText("");
+                    searchField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+                    searchField.setForeground(TEXT_DARK);
+                }
+            }
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (searchField.getText().isEmpty()) {
+                    searchField.setText("What Do You Think?");
+                    searchField.setFont(new Font("Segoe UI", Font.ITALIC, 14));
+                    searchField.setForeground(TEXT_GRAY);
+                }
+            }
+        });
+
+        searchField.addActionListener(e -> performSearch());
+
+        searchPanel.add(searchWrapper);
+        return searchPanel;
+    }
+
+    private JPanel createSearchControls() {
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        searchPanel.setOpaque(false);
+        searchPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        searchPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
+
+        String placeholder = "Cari judul atau penulis...";
+        String initialText = currentKeyword.isBlank() ? placeholder : currentKeyword;
+        searchField = new JTextField(initialText);
+        searchField.setPreferredSize(new Dimension(400, 40));
+        searchField.setFont(new Font("Segoe UI", currentKeyword.isBlank() ? Font.ITALIC : Font.PLAIN, 14));
+        searchField.setForeground(currentKeyword.isBlank() ? TEXT_GRAY : TEXT_DARK);
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(210, 210, 210), 1, true),
+                new EmptyBorder(8, 14, 8, 14)
+        ));
+        searchField.addFocusListener(new FocusListener() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (searchField.getText().equals(placeholder)) {
+                    searchField.setText("");
+                    searchField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+                    searchField.setForeground(TEXT_DARK);
+                }
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (searchField.getText().isBlank()) {
+                    searchField.setText(placeholder);
+                    searchField.setFont(new Font("Segoe UI", Font.ITALIC, 14));
+                    searchField.setForeground(TEXT_GRAY);
+                }
+            }
+        });
+        searchField.addActionListener(e -> performSearch());
+
+        categoryFilter = new JComboBox<>(loadCategoryOptions());
+        categoryFilter.setPreferredSize(new Dimension(180, 40));
+        categoryFilter.setSelectedItem(currentCategory);
+        categoryFilter.addActionListener(e -> {
+            Object selected = categoryFilter.getSelectedItem();
+            currentCategory = selected == null ? "Semua kategori" : selected.toString();
+            performSearch();
+        });
+
+        JButton searchButton = new JButton("Cari");
+        searchButton.setPreferredSize(new Dimension(80, 40));
+        searchButton.setBackground(ACCENT);
+        searchButton.setForeground(WHITE);
+        searchButton.setFocusPainted(false);
+        searchButton.setBorderPainted(false);
+        searchButton.addActionListener(e -> performSearch());
+
+        searchPanel.add(searchField);
+        searchPanel.add(categoryFilter);
+        searchPanel.add(searchButton);
+        return searchPanel;
+    }
+
+    private String[] loadCategoryOptions() {
+        java.util.List<String> options = new java.util.ArrayList<>();
+        options.add("Semua kategori");
+        try {
+            for (String category : libraryApi.getBookCategories()) {
+                if (category != null && !category.isBlank() && !options.contains(category)) {
+                    options.add(category);
+                }
+            }
+        } catch (SQLException exception) {
+            logger.log(java.util.logging.Level.WARNING, "Gagal memuat kategori", exception);
+        }
+        return options.toArray(new String[0]);
+    }
+
+    // ============================================================
     // CONTENT SECTIONS
     // ============================================================
-    private void showDashboard() {
+    private void loadBookshelf() {
         contentPanel.removeAll();
 
-        // Ambil data dari API
+        // Search bar
+        contentPanel.add(createSearchBar());
+        contentPanel.add(Box.createVerticalStrut(25));
+
         try {
-            com.mycompany.perpustakaan.api.DashboardSummary summary = libraryApi.getDashboardSummary(5);
-            List<com.mycompany.perpustakaan.api.BookSummary> books = summary.getLatestBooks();
+            if (!currentKeyword.isBlank() || !"Semua kategori".equals(currentCategory)) {
+                contentPanel.add(createCategorySection("HASIL PENCARIAN", currentKeyword, currentCategory));
+                contentPanel.revalidate();
+                contentPanel.repaint();
+                return;
+            }
 
-            // Section: TRENDING (mock data - pake latest books)
-            contentPanel.add(createSection("TRENDING", books, true));
-            contentPanel.add(Box.createVerticalStrut(25));
+            // Ambil kategori dari API
+            List<String> categories = libraryApi.getBookCategories();
+            
+            // Mock: kalo API gak ada, pake default
+            if (categories == null || categories.isEmpty()) {
+                categories = List.of("SCI-FI", "FANTASY", "ECONOMY", "LAW");
+            }
 
-            // Section: AWARDS (mock - subset)
-            contentPanel.add(createSection("AWARDS", books, false));
-            contentPanel.add(Box.createVerticalStrut(25));
+            for (String category : categories) {
+                contentPanel.add(createCategorySection(category));
+                contentPanel.add(Box.createVerticalStrut(25));
+            }
 
-            // Section: NEW
-            contentPanel.add(createSection("NEW", books, true));
-            contentPanel.add(Box.createVerticalStrut(25));
-
-            // Section: UPCOMING
-            contentPanel.add(createSection("UPCOMING", books, false));
+            // Pagination dots (mock)
+            contentPanel.add(createPaginationDots());
 
         } catch (SQLException e) {
-            showError("Gagal memuat dashboard", e);
-            // Fallback: kosong
-            contentPanel.add(createSection("TRENDING", java.util.Collections.emptyList(), true));
+            showError("Gagal memuat bookshelf", e);
+            // Fallback
+            String[] fallback = {"SCI-FI", "FANTASY", "ECONOMY", "LAW"};
+            for (String cat : fallback) {
+                contentPanel.add(createCategorySection(cat));
+                contentPanel.add(Box.createVerticalStrut(25));
+            }
         }
 
         contentPanel.revalidate();
         contentPanel.repaint();
     }
 
-    private JPanel createSection(String title, List<com.mycompany.perpustakaan.api.BookSummary> books, boolean alternateStatus) {
+    private JPanel createCategorySection(String category) {
+        return createCategorySection(category, "", category);
+    }
+
+    private JPanel createCategorySection(String title, String keyword, String categoryFilterValue) {
         JPanel section = new JPanel();
         section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
         section.setOpaque(false);
         section.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Title with arrow
+        // Title
         JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
         titlePanel.setOpaque(false);
         titlePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -384,19 +514,32 @@ public class Dashboard extends JFrame {
 
         titlePanel.add(titleLabel);
         titlePanel.add(arrow);
-
         section.add(titlePanel);
         section.add(Box.createVerticalStrut(15));
 
-        // Horizontal scroll cards
+        // Cards
         HorizontalScrollPanel scrollPanel = new HorizontalScrollPanel();
-        
-        // Mock cards - dalam real app, iterate books
-        for (int i = 0; i < 8; i++) {
-            boolean available = alternateStatus ? (i % 2 == 0) : (i % 2 != 0);
-            String bookTitle = i < books.size() ? books.get(i).getJudul() : "TITLE " + (i + 1);
-            String author = i < books.size() ? books.get(i).getPenulis() : "AUTHOR";
-            scrollPanel.addCard(bookTitle, author, available);
+
+        try {
+            // Ambil buku per kategori (page 1, 5 items)
+            String safeKeyword = keyword == null || keyword.isBlank() ? null : keyword;
+            String safeCategory = categoryFilterValue == null || categoryFilterValue.equals("Semua kategori") ? null : categoryFilterValue;
+            com.mycompany.perpustakaan.api.BookshelfPage page =
+                libraryApi.getBookshelfPage(safeKeyword, safeCategory, 1, 12);
+            
+            List<com.mycompany.perpustakaan.api.BookSummary> books = page.getBooks();
+            
+            if (books.isEmpty()) {
+                scrollPanel.addCard("Tidak ada buku", "Coba keyword/kategori lain", false);
+            } else {
+                for (com.mycompany.perpustakaan.api.BookSummary book : books) {
+                    boolean available = book.getStokTersedia() > 0;
+                    scrollPanel.addCard(book.getJudul(), book.getPenulis(), available);
+                }
+            }
+        } catch (SQLException e) {
+            logger.log(java.util.logging.Level.WARNING, "Gagal memuat kategori " + title, e);
+            scrollPanel.addCard("Gagal memuat", "Periksa koneksi database", false);
         }
 
         section.add(scrollPanel);
@@ -414,8 +557,7 @@ public class Dashboard extends JFrame {
             setOpaque(false);
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 260));
 
-            cardsContainer = new JPanel();
-            cardsContainer.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 0));
+            cardsContainer = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
             cardsContainer.setOpaque(false);
 
             JScrollPane scroll = new JScrollPane(cardsContainer);
@@ -425,11 +567,9 @@ public class Dashboard extends JFrame {
             scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
             scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
             scroll.setPreferredSize(new Dimension(1000, 260));
-
-            // Hide scrollbar tapi tetap bisa scroll
             scroll.getHorizontalScrollBar().setPreferredSize(new Dimension(0, 0));
 
-            // Arrow buttons
+            // Right arrow
             JPanel arrowPanel = new JPanel(new BorderLayout());
             arrowPanel.setOpaque(false);
             arrowPanel.setPreferredSize(new Dimension(40, 260));
@@ -486,7 +626,7 @@ public class Dashboard extends JFrame {
             cover.setOpaque(true);
             cover.setBackground(new Color(250, 250, 250));
 
-            // Info panel
+            // Info
             JPanel info = new JPanel();
             info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
             info.setOpaque(false);
@@ -502,7 +642,6 @@ public class Dashboard extends JFrame {
             authorLabel.setForeground(TEXT_GRAY);
             authorLabel.setMaximumSize(new Dimension(140, 16));
 
-            // Status badge
             JLabel statusLabel = new JLabel(available ? "Tersedia" : "Tidak Tersedia");
             statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 9));
             statusLabel.setForeground(WHITE);
@@ -532,65 +671,40 @@ public class Dashboard extends JFrame {
     }
 
     // ============================================================
-    // DATA LOADING
+    // PAGINATION DOTS
     // ============================================================
-    private void loadUserData() {
-        try {
-            com.mycompany.perpustakaan.api.DashboardSummary summary = libraryApi.getDashboardSummary(5);
-            com.mycompany.perpustakaan.api.UserSummary profile = summary.getProfile();
+    private JPanel createPaginationDots() {
+        JPanel dotsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        dotsPanel.setOpaque(false);
+        dotsPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-            if (profile != null) {
-                welcomeLabel.setText("WELCOME, " + profile.getNama().toUpperCase());
-                roleLabel.setText(profile.getRole() == null ? "USER" : profile.getRole().toUpperCase());
-                setTitle("Dashboard - " + profile.getUsername());
-            }
-        } catch (SQLException e) {
-            logger.log(java.util.logging.Level.SEVERE, "Gagal load user", e);
-        }
-    }
-
-    // ============================================================
-    // MENU ACTIONS (placeholder - sesuaikan dengan logic lo)
-    // ============================================================
-    private void showBookshelf() {
-        contentPanel.removeAll();
-        contentPanel.add(new JLabel("Bookshelf Content", SwingConstants.CENTER));
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
-    private void showLoans() {
-        contentPanel.removeAll();
-        contentPanel.add(new JLabel("Loan Page Content", SwingConstants.CENTER));
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
-    private void showProfile() {
-        com.mycompany.perpustakaan.api.UserSummary profile = libraryApi.getCurrentUser();
-        if (profile == null) {
-            JOptionPane.showMessageDialog(this, "Belum ada user yang login.", "Profil", JOptionPane.WARNING_MESSAGE);
-            return;
+        for (int i = 0; i < 10; i++) {
+            JLabel dot = new JLabel("●");
+            dot.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            dot.setForeground(i == 0 ? TEXT_DARK : new Color(200, 200, 200));
+            dotsPanel.add(dot);
         }
 
-        String message = "Nama: " + profile.getNama()
-                + "\nUsername: " + profile.getUsername()
-                + "\nEmail: " + profile.getEmail()
-                + "\nRole: " + profile.getRole();
-        Object[] options = {"Tutup", "Logout"};
-        int choice = JOptionPane.showOptionDialog(this, message, "Profil", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
-        if (choice == 1) {
-            libraryApi.logout();
-            new LoginForm(libraryApi).setVisible(true);
-            dispose();
-        }
+        return dotsPanel;
     }
 
-    private void showHistory() {
-        contentPanel.removeAll();
-        contentPanel.add(new JLabel("History Content", SwingConstants.CENTER));
-        contentPanel.revalidate();
-        contentPanel.repaint();
+    // ============================================================
+    // SEARCH ACTION
+    // ============================================================
+    private void performSearch() {
+        String keyword = searchField.getText().trim();
+        currentKeyword = keyword.equals("Cari judul atau penulis...") ? "" : keyword;
+        Object selected = categoryFilter == null ? null : categoryFilter.getSelectedItem();
+        currentCategory = selected == null ? "Semua kategori" : selected.toString();
+        loadBookshelf();
+    }
+
+    // ============================================================
+    // NAVIGATION
+    // ============================================================
+    private void openDashboard() {
+        new Dashboard(libraryApi).setVisible(true);
+        dispose();
     }
 
     private void showError(String message, Exception exception) {
@@ -602,6 +716,6 @@ public class Dashboard extends JFrame {
     // MAIN
     // ============================================================
     public static void main(String args[]) {
-        java.awt.EventQueue.invokeLater(() -> new Dashboard().setVisible(true));
+        java.awt.EventQueue.invokeLater(() -> new Bookshelf().setVisible(true));
     }
 }
