@@ -9,6 +9,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Image;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
@@ -153,11 +154,11 @@ public class Dashboard extends JFrame {
             add(Box.createVerticalStrut(10));
 
             // Menu buttons
-            btnDashboard = new SidebarButton("Dashboard", "\u2630"); // ☰
-            btnBookshelf = new SidebarButton("Bookshelf", "\u25A6"); // ▦
-            btnLoan      = new SidebarButton("Loan Page", "\u25A0"); // ■
-            btnProfile   = new SidebarButton("User Profile", "\u263A"); // ☺
-            btnHistory   = new SidebarButton("History", "\u25CB"); // ○
+            btnDashboard = new SidebarButton("Dashboard", "/icon-dashboard.png");
+            btnBookshelf = new SidebarButton("Bookshelf", "/icon-bookshelf.png");
+            btnLoan      = new SidebarButton("Loan Page", "/icon-loan.png");
+            btnProfile   = new SidebarButton("User Profile", "/icon-profile.png");
+            btnHistory   = new SidebarButton("History", "/icon-history.png");
 
             btnDashboard.addActionListener(e -> { setActive(btnDashboard); showDashboard(); });
             btnBookshelf.addActionListener(e -> { setActive(btnBookshelf); showBookshelf(); });
@@ -182,11 +183,14 @@ public class Dashboard extends JFrame {
     }
 
     private class SidebarButton extends JButton {
-        SidebarButton(String text, String icon) {
-            super(icon + "   " + text);
+        SidebarButton(String text, String iconResource) {
+            super(text);
+            setIcon(loadMenuIcon(iconResource));
             setFont(new Font("Segoe UI", Font.BOLD, 14));
             setForeground(TEXT_DARK);
             setBackground(WHITE);
+            setHorizontalAlignment(SwingConstants.LEFT);
+            setIconTextGap(12);
             setFocusPainted(false);
             setBorderPainted(false);
             setContentAreaFilled(false);
@@ -231,6 +235,18 @@ public class Dashboard extends JFrame {
             g2d.dispose();
             super.paintComponent(g);
         }
+    }
+
+    private ImageIcon loadMenuIcon(String resourcePath) {
+        java.net.URL resource = getClass().getResource(resourcePath);
+        if (resource == null) {
+            logger.warning("Icon menu tidak ditemukan: " + resourcePath);
+            return null;
+        }
+
+        ImageIcon source = new ImageIcon(resource);
+        Image scaled = source.getImage().getScaledInstance(22, 22, Image.SCALE_SMOOTH);
+        return new ImageIcon(scaled);
     }
 
     private void setActive(SidebarButton button) {
@@ -455,7 +471,7 @@ public class Dashboard extends JFrame {
             // Cover placeholder
             JLabel cover = new JLabel();
             try {
-                cover.setIcon(new ImageIcon(getClass().getResource("/book_cover.png")));
+                cover.setIcon(new ImageIcon(getClass().getResource("/empty-image.png")));
             } catch (Exception e) {
                 cover.setText("🖼");
                 cover.setFont(new Font("Segoe UI", Font.PLAIN, 40));
