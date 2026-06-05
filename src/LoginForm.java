@@ -306,7 +306,7 @@ public class LoginForm extends JFrame {
                     field.setText("");
                     field.setForeground(TEXT_COLOR);
                     field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    field.setEchoChar('•');
+                    field.setEchoChar('\u2022');
                 }
             }
             @Override

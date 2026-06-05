@@ -10,6 +10,7 @@ import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.sql.SQLException;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -244,7 +245,7 @@ public class SignUp extends JFrame {
                     field.setText("");
                     field.setForeground(TEXT_COLOR);
                     field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    field.setEchoChar('•');
+                    field.setEchoChar('\u2022');
                 }
             }
             @Override
@@ -336,10 +337,23 @@ public class SignUp extends JFrame {
             return;
         }
 
-        JOptionPane.showMessageDialog(this,
-                "Data register sudah valid.\nUntuk menyimpan ke database, backend perlu endpoint self-register publik.",
-                "Register siap", JOptionPane.INFORMATION_MESSAGE);
-        openLogin();
+        try {
+            com.mycompany.perpustakaan.api.MemberRequest request =
+                    new com.mycompany.perpustakaan.api.MemberRequest(username, username, null, password);
+            com.mycompany.perpustakaan.api.MemberResponse response = libraryApi.register(request);
+            if (!response.isSuccess()) {
+                showWarning(response.getMessage());
+                return;
+            }
+
+            JOptionPane.showMessageDialog(this, response.getMessage(), "Register berhasil", JOptionPane.INFORMATION_MESSAGE);
+            openLogin();
+        } catch (SQLException exception) {
+            JOptionPane.showMessageDialog(this, "Gagal terhubung ke backend: " + exception.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            logger.log(java.util.logging.Level.SEVERE, "Register gagal", exception);
+        } catch (IllegalArgumentException exception) {
+            showWarning(exception.getMessage());
+        }
     }
 
     private void showWarning(String message) {
