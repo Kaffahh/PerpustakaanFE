@@ -157,7 +157,7 @@ public class Dashboard extends JFrame {
             if (isStaffOrAdmin()) {
                 addMenuButton("Manajemen Buku", "/icon-bookshelf.png", e -> showBookManagement());
                 addMenuButton("Loans & Returns", "/icon-loan.png", e -> showLoanManagement());
-                addMenuButton("Members", "/Customer.svg", e -> showMemberManagement());
+                addMenuButton("Members", "/icon-member.svg", e -> showMemberManagement());
             } else {
                 addMenuButton("Bookshelf", "/icon-bookshelf.png", e -> openBookshelf());
                 addMenuButton("Pinjam Buku", "/icon-loan.png", e -> showRequestLoan());
@@ -1191,30 +1191,36 @@ public class Dashboard extends JFrame {
     }
 
     private JButton createActionButton(String text) {
-        JButton button = new JButton(text);
+        JButton button = new GradientActionButton(text);
         button.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        button.setForeground(ACCENT);
-        button.setBackground(WHITE);
+        button.setForeground(WHITE);
+        button.setBackground(ACCENT);
         button.setFocusPainted(false);
-        button.setOpaque(true);
-        button.setContentAreaFilled(true);
-        button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(ACCENT, 1),
-                new EmptyBorder(8, 14, 8, 14)
-        ));
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setOpaque(false);
+        button.setBorder(new EmptyBorder(8, 14, 8, 14));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        button.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                button.setBackground(new Color(255, 241, 235));
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                button.setBackground(WHITE);
-            }
-        });
         return button;
+    }
+
+    private class GradientActionButton extends JButton {
+        GradientActionButton(String text) {
+            super(text);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2d = (Graphics2D) g.create();
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            Color start = getModel().isRollover() ? ACCENT_DARK : ACCENT;
+            Color end = getModel().isRollover() ? ACCENT : ACCENT_DARK;
+            GradientPaint gp = new GradientPaint(0, 0, start, getWidth(), getHeight(), end);
+            g2d.setPaint(gp);
+            g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
+            g2d.dispose();
+            super.paintComponent(g);
+        }
     }
 
     private JButton createNotificationButton() {
@@ -1230,7 +1236,8 @@ public class Dashboard extends JFrame {
         button.setFocusPainted(false);
         button.setContentAreaFilled(false);
         button.setOpaque(false);
-        button.setBorder(BorderFactory.createLineBorder(ACCENT, 1));
+        button.setBorderPainted(false);
+        button.setBorder(new EmptyBorder(0, 0, 0, 0));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         button.addActionListener(e -> JOptionPane.showMessageDialog(this, "Belum ada notifikasi baru.", "Notifikasi", JOptionPane.INFORMATION_MESSAGE));
         return button;
