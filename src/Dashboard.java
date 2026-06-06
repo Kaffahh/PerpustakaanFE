@@ -45,19 +45,21 @@ public class Dashboard extends JFrame {
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(Dashboard.class.getName());
     private final com.mycompany.perpustakaan.api.LibraryApi libraryApi;
 
-    private static final Color BG_APP = new Color(245, 245, 245);
+    private static final Color BG_APP = new Color(247, 248, 250);
     private static final Color WHITE = Color.WHITE;
     private static final Color ACCENT = new Color(232, 130, 90);
     private static final Color ACCENT_DARK = new Color(196, 149, 94);
     private static final Color TEXT_DARK = new Color(50, 50, 50);
     private static final Color TEXT_GRAY = new Color(120, 120, 120);
     private static final Color BORDER_COLOR = new Color(224, 224, 224);
+    private static final Color SURFACE_ALT = new Color(252, 252, 252);
+    private static final Color ACCENT_SOFT = new Color(255, 239, 232);
     private static final Color GREEN_STATUS = new Color(0, 200, 83);
     private static final Color RED_STATUS = new Color(255, 23, 68);
 
     private static final Dimension FRAME_SIZE = new Dimension(1280, 720);
-    private static final Dimension SIDEBAR_SIZE = new Dimension(220, 720);
-    private static final Dimension HEADER_SIZE = new Dimension(1060, 80);
+    private static final Dimension SIDEBAR_SIZE = new Dimension(260, 720);
+    private static final Dimension HEADER_SIZE = new Dimension(1060, 92);
     private static final Dimension CARD_SIZE = new Dimension(160, 240);
 
     private SidebarButton activeButton;
@@ -113,7 +115,7 @@ public class Dashboard extends JFrame {
         contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
         contentPanel.setOpaque(false);
-        contentPanel.setBorder(new EmptyBorder(20, 30, 20, 30));
+        contentPanel.setBorder(new EmptyBorder(28, 36, 28, 36));
 
         JScrollPane contentScroll = new JScrollPane(contentPanel);
         contentScroll.setOpaque(false);
@@ -142,7 +144,7 @@ public class Dashboard extends JFrame {
                 logo.setForeground(new Color(139, 90, 43));
             }
             logo.setAlignmentX(Component.CENTER_ALIGNMENT);
-            logo.setBorder(new EmptyBorder(20, 0, 10, 0));
+            logo.setBorder(new EmptyBorder(20, 0, 18, 0));
             add(logo);
 
             JLabel menuTitle = new JLabel(roleTitle());
@@ -207,11 +209,11 @@ public class Dashboard extends JFrame {
             setFocusPainted(false);
             setBorderPainted(false);
             setContentAreaFilled(false);
-            setMaximumSize(new Dimension(180, 45));
-            setPreferredSize(new Dimension(180, 45));
+            setMaximumSize(new Dimension(214, 48));
+            setPreferredSize(new Dimension(214, 48));
             setAlignmentX(Component.CENTER_ALIGNMENT);
             setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-            setBorder(new EmptyBorder(10, 15, 10, 15));
+            setBorder(new EmptyBorder(10, 16, 10, 16));
 
             addMouseListener(new MouseAdapter() {
                 @Override
@@ -237,11 +239,11 @@ public class Dashboard extends JFrame {
             if (this == activeButton) {
                 GradientPaint gp = new GradientPaint(0, 0, ACCENT, getWidth(), getHeight(), ACCENT_DARK);
                 g2d.setPaint(gp);
-                g2d.fillRoundRect(5, 2, getWidth() - 10, getHeight() - 4, 12, 12);
+                g2d.fillRoundRect(5, 2, getWidth() - 10, getHeight() - 4, 14, 14);
                 setForeground(WHITE);
             } else {
                 g2d.setColor(getBackground());
-                g2d.fillRoundRect(5, 2, getWidth() - 10, getHeight() - 4, 12, 12);
+                g2d.fillRoundRect(5, 2, getWidth() - 10, getHeight() - 4, 14, 14);
                 setForeground(TEXT_DARK);
             }
             g2d.dispose();
@@ -640,7 +642,7 @@ public class Dashboard extends JFrame {
                 model.addRow(new Object[]{book.getIdBuku(), book.getKodeBuku(), book.getJudul(), book.getPenulis(), book.getKategori(), book.getStokTersedia()});
             }
             JTable table = createTable(model);
-            contentPanel.add(wrapTable(table, 380));
+            contentPanel.add(wrapTable(table, 520));
             JButton request = createActionButton("Request Pinjam Buku Terpilih");
             request.addActionListener(e -> requestSelectedLoan(table));
             JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 10));
@@ -664,7 +666,7 @@ public class Dashboard extends JFrame {
             for (com.mycompany.perpustakaan.api.LoanSummary loan : libraryApi.getCurrentLoans()) {
                 model.addRow(new Object[]{loan.getIdPeminjaman(), loan.getJudulBuku(), loan.getTanggalPinjam(), loan.getTanggalJatuhTempo(), loan.getStatus(), formatMoney(loan.getDendaBerjalan())});
             }
-            contentPanel.add(createTablePanel(model, 430));
+            contentPanel.add(createTablePanel(model, 520));
         } catch (SQLException e) {
             showError("Gagal memuat pinjaman aktif", e);
         }
@@ -683,7 +685,7 @@ public class Dashboard extends JFrame {
             for (com.mycompany.perpustakaan.api.LoanSummary loan : page.getLoans()) {
                 model.addRow(new Object[]{loan.getIdPeminjaman(), loan.getJudulBuku(), loan.getTanggalPinjam(), loan.getTanggalJatuhTempo(), loan.getTanggalKembali(), loan.getStatus(), formatMoney(loan.getDendaBerjalan())});
             }
-            contentPanel.add(createTablePanel(model, 430));
+            contentPanel.add(createTablePanel(model, 520));
         } catch (SQLException e) {
             showError("Gagal memuat history", e);
         }
@@ -715,7 +717,6 @@ public class Dashboard extends JFrame {
 
     private void showBookFormPage(Integer idBuku) {
         JTextField kode = createField("");
-        JTextField isbn = createField("");
         JTextField judul = createField("");
         JTextField penulis = createField("");
         JTextField penerbit = createField("");
@@ -728,7 +729,6 @@ public class Dashboard extends JFrame {
             try {
                 com.mycompany.perpustakaan.api.BookSummary book = libraryApi.getBookByIdForManagement(idBuku);
                 kode.setText(safe(book.getKodeBuku()));
-                isbn.setText(safe(book.getIsbn()));
                 judul.setText(safe(book.getJudul()));
                 penulis.setText(safe(book.getPenulis()));
                 penerbit.setText(safe(book.getPenerbit()));
@@ -749,24 +749,26 @@ public class Dashboard extends JFrame {
         page.setOpaque(false);
         page.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        page.add(createBookCoverPanel(260, 360), BorderLayout.WEST);
+        page.add(createBookCoverPanel(230, 340), BorderLayout.WEST);
 
         JPanel formCard = new JPanel();
         formCard.setLayout(new BoxLayout(formCard, BoxLayout.Y_AXIS));
         formCard.setBackground(WHITE);
+        formCard.setMaximumSize(new Dimension(620, 520));
         formCard.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER_COLOR),
-                new EmptyBorder(22, 24, 22, 24)
+                new EmptyBorder(24, 28, 24, 28)
         ));
 
-        formCard.add(formPanel(
-                new String[]{"Kode Buku", "ISBN", "Judul", "Penulis", "Penerbit", "Kategori", "Tahun Terbit", "Stok Tersedia", "Stok Total"},
-                new JTextField[]{kode, isbn, judul, penulis, penerbit, kategori, tahun, stokTersedia, stokTotal}
+        formCard.add(createBookFormFields(
+                new String[]{"Kode Buku", "Judul", "Penulis", "Penerbit", "Kategori", "Tahun Terbit", "Stok Tersedia", "Stok Total"},
+                new JTextField[]{kode, judul, penulis, penerbit, kategori, tahun, stokTersedia, stokTotal}
         ));
         formCard.add(Box.createVerticalStrut(18));
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         actions.setOpaque(false);
+        actions.setAlignmentX(Component.LEFT_ALIGNMENT);
         JButton cancel = createNeutralButton("Kembali");
         JButton save = createActionButton(idBuku == null ? "Tambah Buku" : "Simpan Perubahan");
         cancel.addActionListener(e -> showBookManagement());
@@ -774,7 +776,7 @@ public class Dashboard extends JFrame {
             try {
                 Integer tahunValue = tahun.getText().trim().isEmpty() ? null : Integer.valueOf(tahun.getText().trim());
                 com.mycompany.perpustakaan.api.BookRequest request = new com.mycompany.perpustakaan.api.BookRequest(
-                        kode.getText(), blankToNull(isbn.getText()), judul.getText(), penulis.getText(), penerbit.getText(),
+                        kode.getText(), judul.getText(), penulis.getText(), penerbit.getText(),
                         kategori.getText(), tahunValue, Integer.parseInt(stokTersedia.getText().trim()), Integer.parseInt(stokTotal.getText().trim()));
                 com.mycompany.perpustakaan.api.BookResponse response = idBuku == null ? libraryApi.addBook(request) : libraryApi.updateBook(idBuku, request);
                 showResponse(response.isSuccess(), response.getMessage());
@@ -869,7 +871,6 @@ public class Dashboard extends JFrame {
         detail.add(Box.createVerticalStrut(18));
 
         detail.add(createDetailRow("Kode", safe(book.getKodeBuku())));
-        detail.add(createDetailRow("ISBN", safeOrDash(book.getIsbn())));
         detail.add(createDetailRow("Author", safe(book.getPenulis())));
         detail.add(createDetailRow("Penerbit", safeOrDash(book.getPenerbit())));
         detail.add(createDetailRow("Published", book.getTahunTerbit() == null ? "-" : String.valueOf(book.getTahunTerbit())));
@@ -1389,12 +1390,18 @@ public class Dashboard extends JFrame {
     private JPanel createMetricCard(String title, String value) {
         JPanel card = new JPanel(new BorderLayout());
         card.setBackground(WHITE);
-        card.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR), new EmptyBorder(14, 16, 14, 16)));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 5, 0, 0, ACCENT),
+                BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(235, 235, 235)),
+                        new EmptyBorder(16, 18, 16, 18)
+                )
+        ));
         JLabel titleLabel = new JLabel(title);
         titleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         titleLabel.setForeground(TEXT_GRAY);
         JLabel valueLabel = new JLabel(value);
-        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 26));
         valueLabel.setForeground(TEXT_DARK);
         card.add(titleLabel, BorderLayout.NORTH);
         card.add(valueLabel, BorderLayout.CENTER);
@@ -1407,24 +1414,33 @@ public class Dashboard extends JFrame {
 
     private JTable createTable(DefaultTableModel model) {
         JTable table = new JTable(model);
-        table.setRowHeight(28);
-        table.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
-        table.getTableHeader().setBackground(new Color(250, 250, 250));
+        table.setRowHeight(36);
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
+        table.getTableHeader().setBackground(ACCENT_SOFT);
+        table.getTableHeader().setForeground(TEXT_DARK);
         table.setSelectionBackground(new Color(255, 231, 222));
         table.setSelectionForeground(TEXT_DARK);
+        table.setGridColor(new Color(238, 238, 238));
+        table.setShowVerticalLines(false);
+        table.setFillsViewportHeight(true);
         return table;
     }
 
     private JPanel wrapTable(JTable table, int height) {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setOpaque(false);
+        panel.setBackground(WHITE);
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, height + 8));
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, height + 28));
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(234, 234, 234)),
+                new EmptyBorder(12, 12, 12, 12)
+        ));
         JScrollPane scroll = new JScrollPane(table);
         scroll.setPreferredSize(new Dimension(1500, height));
         scroll.setMinimumSize(new Dimension(900, height));
-        scroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(WHITE);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
         panel.add(scroll, BorderLayout.CENTER);
         return panel;
@@ -1432,9 +1448,10 @@ public class Dashboard extends JFrame {
 
     private JPanel createToolbarPanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        panel.setOpaque(false);
+        panel.setBackground(BG_APP);
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+        panel.setBorder(new EmptyBorder(4, 0, 8, 0));
         return panel;
     }
 
@@ -1459,6 +1476,45 @@ public class Dashboard extends JFrame {
             panel.add(fields[i]);
         }
         return panel;
+    }
+
+    private JPanel createBookFormFields(String[] labels, JTextField[] fields) {
+        JPanel form = new JPanel();
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setOpaque(false);
+        form.setAlignmentX(Component.LEFT_ALIGNMENT);
+        form.setMaximumSize(new Dimension(560, 360));
+
+        for (int i = 0; i < labels.length; i++) {
+            JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 0));
+            row.setOpaque(false);
+            row.setAlignmentX(Component.LEFT_ALIGNMENT);
+            row.setMaximumSize(new Dimension(560, 40));
+
+            JLabel label = new JLabel(labels[i]);
+            label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            label.setForeground(TEXT_DARK);
+            label.setPreferredSize(new Dimension(120, 36));
+            label.setHorizontalAlignment(SwingConstants.LEFT);
+
+            JTextField field = fields[i];
+            field.setMaximumSize(new Dimension(360, 36));
+            field.setPreferredSize(new Dimension(360, 36));
+            field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+            field.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(new Color(210, 210, 210)),
+                    new EmptyBorder(7, 10, 7, 10)
+            ));
+
+            row.add(label);
+            row.add(field);
+            form.add(row);
+            if (i < labels.length - 1) {
+                form.add(Box.createVerticalStrut(10));
+            }
+        }
+
+        return form;
     }
 
     private JTextField createField(String value) {
@@ -1688,12 +1744,29 @@ public class Dashboard extends JFrame {
     }
 
     private void addTitle(String title) {
+        JPanel titlePanel = new JPanel(new BorderLayout());
+        titlePanel.setOpaque(false);
+        titlePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        titlePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+
         JLabel label = new JLabel(title);
-        label.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        label.setFont(new Font("Segoe UI", Font.BOLD, 26));
         label.setForeground(TEXT_DARK);
-        label.setAlignmentX(Component.LEFT_ALIGNMENT);
-        contentPanel.add(label);
-        contentPanel.add(Box.createVerticalStrut(18));
+        titlePanel.add(label, BorderLayout.WEST);
+
+        JPanel accentLine = new JPanel();
+        accentLine.setPreferredSize(new Dimension(90, 4));
+        accentLine.setBackground(ACCENT);
+
+        JPanel titleWrap = new JPanel();
+        titleWrap.setLayout(new BoxLayout(titleWrap, BoxLayout.Y_AXIS));
+        titleWrap.setOpaque(false);
+        titleWrap.add(titlePanel);
+        titleWrap.add(accentLine);
+        titleWrap.setAlignmentX(Component.LEFT_ALIGNMENT);
+        titleWrap.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+        contentPanel.add(titleWrap);
+        contentPanel.add(Box.createVerticalStrut(22));
     }
 
     private void resetContent() {
