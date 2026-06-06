@@ -91,6 +91,7 @@ public class Dashboard extends JFrame {
         setTitle("Dashboard Perpustakaan");
         setSize(FRAME_SIZE);
         setMinimumSize(FRAME_SIZE);
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
         setLocationRelativeTo(null);
 
         JPanel root = new JPanel(new BorderLayout(0, 0));
@@ -378,7 +379,7 @@ public class Dashboard extends JFrame {
                     row.getStatusKetersediaan()
                 });
             }
-            contentPanel.add(createTablePanel(model, 430));
+            contentPanel.add(createTablePanel(model, 560));
         } catch (SQLException e) {
             showError("Gagal memuat laporan inventory", e);
         }
@@ -389,8 +390,7 @@ public class Dashboard extends JFrame {
         resetContent();
         addTitle("Laporan Peminjaman Berdasarkan Tanggal");
 
-        JPanel filter = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        filter.setOpaque(false);
+        JPanel filter = createToolbarPanel();
         JTextField start = createField(LocalDate.now().minusMonths(1).toString());
         JTextField end = createField(LocalDate.now().toString());
         JButton load = createActionButton("Tampilkan");
@@ -406,9 +406,8 @@ public class Dashboard extends JFrame {
         contentPanel.add(filter);
         contentPanel.add(Box.createVerticalStrut(15));
 
-        JPanel tableHolder = new JPanel(new BorderLayout());
+        JPanel tableHolder = createDynamicContentPanel();
         tableHolder.setOpaque(false);
-        tableHolder.setAlignmentX(Component.LEFT_ALIGNMENT);
         contentPanel.add(tableHolder);
 
         Runnable render = () -> {
@@ -429,7 +428,7 @@ public class Dashboard extends JFrame {
                         formatMoney(row.getDenda())
                     });
                 }
-                tableHolder.add(createTablePanel(model, 390), BorderLayout.CENTER);
+                tableHolder.add(createTablePanel(model, 540));
                 refreshContent();
             } catch (SQLException | DateTimeParseException e) {
                 showError("Gagal memuat laporan peminjaman", e);
@@ -457,7 +456,7 @@ public class Dashboard extends JFrame {
                     row.getStokTersedia() + "/" + row.getStokTotal()
                 });
             }
-            contentPanel.add(createTablePanel(model, 430));
+            contentPanel.add(createTablePanel(model, 560));
         } catch (SQLException e) {
             showError("Gagal memuat laporan buku populer", e);
         }
@@ -483,10 +482,9 @@ public class Dashboard extends JFrame {
                 });
             }
             JTable table = createTable(model);
-            contentPanel.add(wrapTable(table, 360));
+            contentPanel.add(wrapTable(table, 520));
 
-            JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
-            actions.setOpaque(false);
+            JPanel actions = createToolbarPanel();
             JButton detail = createActionButton("Detail");
             JButton update = createActionButton("Update");
             JButton stock = createActionButton("Update Stok");
@@ -510,8 +508,7 @@ public class Dashboard extends JFrame {
     private void showLoanManagement() {
         resetContent();
         addTitle("Loans & Returns");
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        actions.setOpaque(false);
+        JPanel actions = createToolbarPanel();
         JButton create = createActionButton("Buat Peminjaman");
         JComboBox<String> status = new JComboBox<>(new String[]{"semua", "aktif", "dipinjam", "terlambat", "dikembalikan"});
         JButton load = createActionButton("Tampilkan");
@@ -522,9 +519,7 @@ public class Dashboard extends JFrame {
         contentPanel.add(actions);
         contentPanel.add(Box.createVerticalStrut(15));
 
-        JPanel tableHolder = new JPanel(new BorderLayout());
-        tableHolder.setOpaque(false);
-        tableHolder.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel tableHolder = createDynamicContentPanel();
         contentPanel.add(tableHolder);
 
         Runnable render = () -> {
@@ -544,16 +539,15 @@ public class Dashboard extends JFrame {
                     });
                 }
                 JTable table = createTable(model);
-                JPanel panel = new JPanel(new BorderLayout());
+                JPanel panel = createDynamicContentPanel();
                 panel.setOpaque(false);
-                panel.add(wrapTable(table, 340), BorderLayout.CENTER);
+                panel.add(wrapTable(table, 500));
                 JButton returnButton = createActionButton("Proses Pengembalian Terpilih");
                 returnButton.addActionListener(e -> processSelectedReturn(table));
-                JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 10));
-                footer.setOpaque(false);
+                JPanel footer = createToolbarPanel();
                 footer.add(returnButton);
-                panel.add(footer, BorderLayout.SOUTH);
-                tableHolder.add(panel, BorderLayout.CENTER);
+                panel.add(footer);
+                tableHolder.add(panel);
                 refreshContent();
             } catch (SQLException e) {
                 showError("Gagal memuat loans & returns", e);
@@ -581,9 +575,8 @@ public class Dashboard extends JFrame {
                 });
             }
             JTable table = createTable(model);
-            contentPanel.add(wrapTable(table, 360));
-            JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
-            actions.setOpaque(false);
+            contentPanel.add(wrapTable(table, 520));
+            JPanel actions = createToolbarPanel();
             JButton update = createActionButton("Update");
             JButton suspend = createActionButton("Suspend");
             JButton activate = createActionButton("Aktifkan");
@@ -758,11 +751,16 @@ public class Dashboard extends JFrame {
         refreshContent();
     }
 
-    private void updateSelectedBook(JTable table) {
-        Integer id = selectedId(table);
-        if (id != null) {
-            showBookFormPage(id);
+    private void showBookFormPageFromTable(JTable table) {
+        Integer idBuku = selectedId(table);
+        if (idBuku == null) {
+            return;
         }
+        showBookFormPage(idBuku);
+    }
+
+    private void updateSelectedBook(JTable table) {
+        showBookFormPageFromTable(table);
     }
 
     private void showSelectedBookDetail(JTable table) {
@@ -1017,24 +1015,41 @@ public class Dashboard extends JFrame {
     }
 
     private void showAddMemberDialog() {
-        saveMember(null);
+        saveMember(null, null);
         showMemberManagement();
     }
 
     private void updateSelectedMember(JTable table) {
         Integer id = selectedId(table);
         if (id != null) {
-            saveMember(id);
+            saveMember(id, selectedMemberFromTable(table));
             showMemberManagement();
         }
     }
 
-    private void saveMember(Integer idUser) {
+    private void saveMember(Integer idUser, com.mycompany.perpustakaan.api.MemberSummary initialMember) {
         JTextField username = createField("");
         JTextField nama = createField("");
         JTextField email = createField("");
         JTextField password = createField("");
-        JPanel panel = formPanel(new String[]{"Username", "Nama", "Email", "Password"}, new JTextField[]{username, nama, email, password});
+
+        if (initialMember != null) {
+            username.setText(safe(initialMember.getUsername()));
+            nama.setText(safe(initialMember.getNama()));
+            email.setText(safe(initialMember.getEmail()));
+        }
+
+        JPanel panel = formPanel(
+                new String[]{"Username", "Nama", "Email", idUser == null ? "Password" : "Password baru"},
+                new JTextField[]{username, nama, email, password}
+        );
+        if (idUser != null) {
+            JLabel hint = new JLabel("Kosongkan password kalau tidak ingin mengganti password lama.");
+            hint.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+            hint.setForeground(TEXT_GRAY);
+            panel.add(new JLabel(""));
+            panel.add(hint);
+        }
         int result = JOptionPane.showConfirmDialog(this, panel, idUser == null ? "Tambah Anggota" : "Update Anggota", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (result == JOptionPane.OK_OPTION) {
             try {
@@ -1045,6 +1060,19 @@ public class Dashboard extends JFrame {
                 showError("Gagal menyimpan anggota", e);
             }
         }
+    }
+
+    private com.mycompany.perpustakaan.api.MemberSummary selectedMemberFromTable(JTable table) {
+        int selected = table.getSelectedRow();
+        if (selected < 0) {
+            return null;
+        }
+        int id = Integer.parseInt(String.valueOf(table.getValueAt(selected, 0)));
+        String nama = String.valueOf(table.getValueAt(selected, 1));
+        String username = String.valueOf(table.getValueAt(selected, 2));
+        String email = String.valueOf(table.getValueAt(selected, 3));
+        String status = String.valueOf(table.getValueAt(selected, 4));
+        return new com.mycompany.perpustakaan.api.MemberSummary(id, nama, email, username, "anggota", status, null);
     }
 
     private void changeSelectedMemberStatus(JTable table, boolean suspend) {
@@ -1296,9 +1324,7 @@ public class Dashboard extends JFrame {
     }
 
     private void addQuickActions(String[] labels, Runnable[] actions) {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        panel.setOpaque(false);
-        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel panel = createToolbarPanel();
         for (int i = 0; i < labels.length; i++) {
             JButton button = createActionButton(labels[i]);
             Runnable action = actions[i];
@@ -1351,11 +1377,30 @@ public class Dashboard extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setOpaque(false);
         panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, height + 8));
         JScrollPane scroll = new JScrollPane(table);
-        scroll.setPreferredSize(new Dimension(980, height));
+        scroll.setPreferredSize(new Dimension(1500, height));
+        scroll.setMinimumSize(new Dimension(900, height));
         scroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
         panel.add(scroll, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JPanel createToolbarPanel() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        panel.setOpaque(false);
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        return panel;
+    }
+
+    private JPanel createDynamicContentPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setOpaque(false);
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         return panel;
     }
 
