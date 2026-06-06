@@ -7,14 +7,12 @@ import java.awt.Font;
 import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
 import java.awt.Image;
-import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -26,7 +24,6 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTable;
 import javax.swing.SwingConstants;
 import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
@@ -36,29 +33,25 @@ public class Dashboard extends JFrame {
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(Dashboard.class.getName());
     private final com.mycompany.perpustakaan.api.LibraryApi libraryApi;
 
-    // === WARNA ===
-    private static final Color BG_APP        = new Color(245, 245, 245);
-    private static final Color WHITE         = Color.WHITE;
-    private static final Color ACCENT        = new Color(232, 130, 90);   // Oranye
-    private static final Color ACCENT_DARK   = new Color(196, 149, 94);   // Coklat muda
-    private static final Color TEXT_DARK     = new Color(50, 50, 50);
-    private static final Color TEXT_GRAY     = new Color(120, 120, 120);
-    private static final Color BORDER_COLOR  = new Color(224, 224, 224);
-    private static final Color GREEN_STATUS  = new Color(0, 200, 83);
-    private static final Color RED_STATUS    = new Color(255, 23, 68);
+    // WARNA
+    private static final Color BG_APP = new Color(245, 245, 245);
+    private static final Color WHITE = Color.WHITE;
+    private static final Color ACCENT = new Color(232, 130, 90);
+    private static final Color ACCENT_DARK = new Color(196, 149, 94);
+    private static final Color TEXT_DARK = new Color(50, 50, 50);
+    private static final Color TEXT_GRAY = new Color(120, 120, 120);
+    private static final Color BORDER_COLOR = new Color(224, 224, 224);
+    private static final Color GREEN_STATUS = new Color(0, 200, 83);
+    private static final Color RED_STATUS = new Color(255, 23, 68);
 
-    private static final Dimension FRAME_SIZE    = new Dimension(1280, 720);
-    private static final Dimension SIDEBAR_SIZE  = new Dimension(220, 720);
-    private static final Dimension HEADER_SIZE   = new Dimension(1060, 80);
-    private static final Dimension CARD_SIZE     = new Dimension(160, 240);
+    private static final Dimension FRAME_SIZE = new Dimension(1280, 720);
+    private static final Dimension SIDEBAR_SIZE = new Dimension(220, 720);
+    private static final Dimension HEADER_SIZE = new Dimension(1060, 80);
+    private static final Dimension CARD_SIZE = new Dimension(160, 240);
 
-    // Menu buttons
-    private SidebarButton btnDashboard, btnBookshelf, btnLoan, btnProfile, btnHistory;
     private SidebarButton activeButton;
-
-    // Content
-    private JPanel contentPanel;
-    private JLabel welcomeLabel, roleLabel;
+    private JLabel welcomeLabel;
+    private JLabel roleLabel;
 
     public Dashboard() {
         this(new com.mycompany.perpustakaan.api.LibraryApi());
@@ -66,13 +59,11 @@ public class Dashboard extends JFrame {
 
     public Dashboard(com.mycompany.perpustakaan.api.LibraryApi libraryApi) {
         this.libraryApi = libraryApi;
-        
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
             // fallback
         }
-        
         initComponents();
         loadUserData();
     }
@@ -88,11 +79,11 @@ public class Dashboard extends JFrame {
         root.setBackground(BG_APP);
         setContentPane(root);
 
-        // === SIDEBAR ===
+        // Sidebar
         SidebarPanel sidebar = new SidebarPanel();
         root.add(sidebar, BorderLayout.WEST);
 
-        // === MAIN AREA ===
+        // Main area
         JPanel mainArea = new JPanel(new BorderLayout(0, 0));
         mainArea.setOpaque(false);
 
@@ -101,7 +92,7 @@ public class Dashboard extends JFrame {
         mainArea.add(header, BorderLayout.NORTH);
 
         // Content
-        contentPanel = new JPanel();
+        JPanel contentPanel = new JPanel();
         contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
         contentPanel.setOpaque(false);
         contentPanel.setBorder(new EmptyBorder(20, 30, 20, 30));
@@ -112,17 +103,15 @@ public class Dashboard extends JFrame {
         contentScroll.setBorder(null);
         contentScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         contentScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        mainArea.add(contentScroll, BorderLayout.CENTER);
 
+        mainArea.add(contentScroll, BorderLayout.CENTER);
         root.add(mainArea, BorderLayout.CENTER);
 
-        // Load default content
-        showDashboard();
+        // Load content
+        loadDashboardContent(contentPanel);
     }
 
-    // ============================================================
-    // SIDEBAR
-    // ============================================================
+    // ==================== SIDEBAR ====================
     private class SidebarPanel extends JPanel {
         SidebarPanel() {
             setPreferredSize(SIDEBAR_SIZE);
@@ -150,25 +139,33 @@ public class Dashboard extends JFrame {
             menuTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
             menuTitle.setBorder(new EmptyBorder(10, 0, 10, 0));
             add(menuTitle);
-
             add(Box.createVerticalStrut(10));
 
-            // Menu buttons
-            btnDashboard = new SidebarButton("Dashboard", "/icon-dashboard.png");
-            btnBookshelf = new SidebarButton("Bookshelf", "/icon-bookshelf.png");
-            btnLoan      = new SidebarButton("Loan Page", "/icon-loan.png");
-            btnProfile   = new SidebarButton("User Profile", "/icon-profile.png");
-            btnHistory   = new SidebarButton("History", "/icon-history.png");
+            // Buttons
+            SidebarButton btnDashboard = new SidebarButton("Dashboard", "/icon-dashboard.png");
+            SidebarButton btnBookshelf = new SidebarButton("Bookshelf", "/icon-bookshelf.png");
+            SidebarButton btnLoan = new SidebarButton("Loan Page", "/icon-loan.png");
+            SidebarButton btnProfile = new SidebarButton("User Profile", "/icon-profile.png");
+            SidebarButton btnHistory = new SidebarButton("History", "/icon-history.png");
 
-            btnDashboard.addActionListener(e -> { setActive(btnDashboard); showDashboard(); });
-            btnBookshelf.addActionListener(e -> { 
-                setActive(btnBookshelf); 
+            btnDashboard.addActionListener(e -> {
+                setActive(btnDashboard);
+            });
+            btnBookshelf.addActionListener(e -> {
+                setActive(btnBookshelf);
                 new Bookshelf(libraryApi).setVisible(true);
                 dispose();
             });
-            btnLoan.addActionListener(e -> { setActive(btnLoan); showLoans(); });
-            btnProfile.addActionListener(e -> { setActive(btnProfile); showProfile(); });
-            btnHistory.addActionListener(e -> { setActive(btnHistory); showHistory(); });
+            btnLoan.addActionListener(e -> {
+                setActive(btnLoan);
+            });
+            btnProfile.addActionListener(e -> {
+                setActive(btnProfile);
+                showProfile();
+            });
+            btnHistory.addActionListener(e -> {
+                setActive(btnHistory);
+            });
 
             add(btnDashboard);
             add(Box.createVerticalStrut(8));
@@ -180,8 +177,7 @@ public class Dashboard extends JFrame {
             add(Box.createVerticalStrut(8));
             add(btnHistory);
 
-            setActive(btnDashboard); // Default active
-
+            setActive(btnDashboard);
             add(Box.createVerticalGlue());
         }
     }
@@ -211,6 +207,7 @@ public class Dashboard extends JFrame {
                         setBackground(new Color(250, 250, 250));
                     }
                 }
+
                 @Override
                 public void mouseExited(MouseEvent e) {
                     if (SidebarButton.this != activeButton) {
@@ -244,13 +241,24 @@ public class Dashboard extends JFrame {
     private ImageIcon loadMenuIcon(String resourcePath) {
         java.net.URL resource = getClass().getResource(resourcePath);
         if (resource == null) {
-            logger.warning("Icon menu tidak ditemukan: " + resourcePath);
             return null;
         }
-
         ImageIcon source = new ImageIcon(resource);
         Image scaled = source.getImage().getScaledInstance(22, 22, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
+    }
+
+    private ImageIcon loadBookCoverPlaceholder() {
+        String[] candidates = {"/empty-img.png", "/empty-image.png"};
+        for (String candidate : candidates) {
+            java.net.URL resource = getClass().getResource(candidate);
+            if (resource != null) {
+                ImageIcon source = new ImageIcon(resource);
+                Image scaled = source.getImage().getScaledInstance(160, 100, Image.SCALE_SMOOTH);
+                return new ImageIcon(scaled);
+            }
+        }
+        return null;
     }
 
     private void setActive(SidebarButton button) {
@@ -261,20 +269,18 @@ public class Dashboard extends JFrame {
         activeButton.repaint();
     }
 
-    // ============================================================
-    // HEADER
-    // ============================================================
+    // ==================== HEADER ====================
     private class HeaderPanel extends JPanel {
         HeaderPanel() {
             setPreferredSize(HEADER_SIZE);
             setBackground(WHITE);
             setLayout(new BorderLayout());
             setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR),
-                new EmptyBorder(15, 25, 15, 25)
+                    BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR),
+                    new EmptyBorder(15, 25, 15, 25)
             ));
 
-            // Left: Profile + Welcome
+            // Left: Profile
             JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
             left.setOpaque(false);
 
@@ -315,22 +321,14 @@ public class Dashboard extends JFrame {
                 notif.setFont(new Font("Segoe UI", Font.PLAIN, 24));
             }
             notif.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-            notif.addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    JOptionPane.showMessageDialog(Dashboard.this, "Tidak ada notifikasi baru.", "Notifikasi", JOptionPane.INFORMATION_MESSAGE);
-                }
-            });
 
             add(left, BorderLayout.WEST);
             add(notif, BorderLayout.EAST);
         }
     }
 
-    // ============================================================
-    // CONTENT SECTIONS
-    // ============================================================
-    private void showDashboard() {
+    // ==================== CONTENT ====================
+    private void loadDashboardContent(JPanel contentPanel) {
         contentPanel.removeAll();
 
         try {
@@ -338,27 +336,30 @@ public class Dashboard extends JFrame {
             List<com.mycompany.perpustakaan.api.BookSummary> popularBooks = summary.getPopularBooks();
             List<com.mycompany.perpustakaan.api.BookSummary> latestBooks = summary.getLatestBooks();
 
-            contentPanel.add(createSection("BUKU TERPOPULER", popularBooks));
-            contentPanel.add(Box.createVerticalStrut(25));
-            contentPanel.add(createSection("BUKU TERBARU", latestBooks));
+            // Section 1: BUKU TERPOPULER
+            contentPanel.add(createSection("BUKU TERPOPULER", popularBooks, true));
+            contentPanel.add(Box.createVerticalStrut(20));
+
+            // Section 2: BUKU TERBARU
+            contentPanel.add(createSection("BUKU TERBARU", latestBooks, true));
 
         } catch (SQLException e) {
             showError("Gagal memuat dashboard", e);
-            contentPanel.add(createSection("BUKU TERPOPULER", java.util.Collections.emptyList()));
+            contentPanel.add(createSection("BUKU TERPOPULER", Collections.emptyList(), true));
         }
 
         contentPanel.revalidate();
         contentPanel.repaint();
     }
 
-    private JPanel createSection(String title, List<com.mycompany.perpustakaan.api.BookSummary> books) {
+    private JPanel createSection(String title, List<com.mycompany.perpustakaan.api.BookSummary> books, boolean withArrow) {
         JPanel section = new JPanel();
         section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
         section.setOpaque(false);
         section.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Title with arrow
-        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        // Title
+        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         titlePanel.setOpaque(false);
         titlePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -366,19 +367,21 @@ public class Dashboard extends JFrame {
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         titleLabel.setForeground(ACCENT);
 
-        JLabel arrow = new JLabel("→");
-        arrow.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        arrow.setForeground(ACCENT);
-
         titlePanel.add(titleLabel);
-        titlePanel.add(arrow);
+
+        if (withArrow) {
+            JLabel arrow = new JLabel("→");
+            arrow.setFont(new Font("Segoe UI", Font.BOLD, 18));
+            arrow.setForeground(ACCENT);
+            titlePanel.add(arrow);
+        }
 
         section.add(titlePanel);
         section.add(Box.createVerticalStrut(15));
 
-        // Horizontal scroll cards
+        // Cards
         HorizontalScrollPanel scrollPanel = new HorizontalScrollPanel();
-        
+
         if (books == null || books.isEmpty()) {
             scrollPanel.addCard("Belum ada buku", "Data belum tersedia", false);
         } else {
@@ -391,9 +394,7 @@ public class Dashboard extends JFrame {
         return section;
     }
 
-    // ============================================================
-    // HORIZONTAL SCROLL CARDS
-    // ============================================================
+    // ==================== HORIZONTAL SCROLL ====================
     private class HorizontalScrollPanel extends JPanel {
         private JPanel cardsContainer;
 
@@ -401,9 +402,9 @@ public class Dashboard extends JFrame {
             setLayout(new BorderLayout());
             setOpaque(false);
             setMaximumSize(new Dimension(Integer.MAX_VALUE, 260));
+            setAlignmentX(Component.LEFT_ALIGNMENT);
 
-            cardsContainer = new JPanel();
-            cardsContainer.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 0));
+            cardsContainer = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
             cardsContainer.setOpaque(false);
 
             JScrollPane scroll = new JScrollPane(cardsContainer);
@@ -413,25 +414,40 @@ public class Dashboard extends JFrame {
             scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
             scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
             scroll.setPreferredSize(new Dimension(1000, 260));
-
-            // Hide scrollbar tapi tetap bisa scroll
             scroll.getHorizontalScrollBar().setPreferredSize(new Dimension(0, 0));
+            scroll.getHorizontalScrollBar().setUnitIncrement(16);
 
-            // Arrow buttons
+            // Right arrow
             JPanel arrowPanel = new JPanel(new BorderLayout());
             arrowPanel.setOpaque(false);
-            arrowPanel.setPreferredSize(new Dimension(40, 260));
+            arrowPanel.setPreferredSize(new Dimension(36, 260));
 
-            JLabel rightArrow = new JLabel("▶");
-            rightArrow.setFont(new Font("Segoe UI", Font.BOLD, 24));
-            rightArrow.setForeground(TEXT_DARK);
+            JLabel rightArrow = new JLabel("▶") {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2d = (Graphics2D) g.create();
+                    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2d.setColor(new Color(0, 0, 0, 80));
+                    g2d.fillOval(2, 2, getWidth() - 4, getHeight() - 4);
+                    g2d.setColor(WHITE);
+                    g2d.setFont(getFont());
+                    java.awt.FontMetrics fm = g2d.getFontMetrics();
+                    int textX = (getWidth() - fm.stringWidth(getText())) / 2;
+                    int textY = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                    g2d.drawString(getText(), textX, textY);
+                    g2d.dispose();
+                }
+            };
+            rightArrow.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            rightArrow.setForeground(WHITE);
             rightArrow.setHorizontalAlignment(SwingConstants.CENTER);
+            rightArrow.setPreferredSize(new Dimension(32, 32));
             rightArrow.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
             rightArrow.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
                     scroll.getHorizontalScrollBar().setValue(
-                        scroll.getHorizontalScrollBar().getValue() + 320
+                            scroll.getHorizontalScrollBar().getValue() + 340
                     );
                 }
             });
@@ -447,26 +463,24 @@ public class Dashboard extends JFrame {
         }
     }
 
-    // ============================================================
-    // BOOK CARD
-    // ============================================================
+    // ==================== BOOK CARD ====================
     private class BookCard extends JPanel {
         BookCard(String title, String author, boolean available) {
             setPreferredSize(CARD_SIZE);
             setBackground(WHITE);
             setLayout(new BorderLayout());
             setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_COLOR, 1),
-                new EmptyBorder(0, 0, 10, 0)
+                    BorderFactory.createLineBorder(BORDER_COLOR, 1),
+                    new EmptyBorder(0, 0, 10, 0)
             ));
 
-            // Cover placeholder
             JLabel cover = new JLabel();
-            try {
-                cover.setIcon(new ImageIcon(getClass().getResource("/empty-image.png")));
-            } catch (Exception e) {
-                cover.setText("🖼");
-                cover.setFont(new Font("Segoe UI", Font.PLAIN, 40));
+            ImageIcon placeholder = loadBookCoverPlaceholder();
+            if (placeholder != null) {
+                cover.setIcon(placeholder);
+            } else {
+                cover.setText("No Image");
+                cover.setFont(new Font("Segoe UI", Font.PLAIN, 12));
                 cover.setForeground(TEXT_GRAY);
             }
             cover.setHorizontalAlignment(SwingConstants.CENTER);
@@ -474,23 +488,22 @@ public class Dashboard extends JFrame {
             cover.setOpaque(true);
             cover.setBackground(new Color(250, 250, 250));
 
-            // Info panel
+            // Info
             JPanel info = new JPanel();
             info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
             info.setOpaque(false);
             info.setBorder(new EmptyBorder(10, 12, 5, 12));
 
-            JLabel titleLabel = new JLabel(title);
-            titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 13));
+            JLabel titleLabel = new JLabel(truncate(title, 18));
+            titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
             titleLabel.setForeground(TEXT_DARK);
-            titleLabel.setMaximumSize(new Dimension(140, 20));
+            titleLabel.setMaximumSize(new Dimension(140, 18));
 
-            JLabel authorLabel = new JLabel(author);
-            authorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+            JLabel authorLabel = new JLabel(truncate(author, 20));
+            authorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
             authorLabel.setForeground(TEXT_GRAY);
-            authorLabel.setMaximumSize(new Dimension(140, 16));
+            authorLabel.setMaximumSize(new Dimension(140, 14));
 
-            // Status badge
             JLabel statusLabel = new JLabel(available ? "Tersedia" : "Tidak Tersedia");
             statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 9));
             statusLabel.setForeground(WHITE);
@@ -498,17 +511,17 @@ public class Dashboard extends JFrame {
             statusLabel.setBackground(available ? GREEN_STATUS : RED_STATUS);
             statusLabel.setBorder(new EmptyBorder(3, 8, 3, 8));
             statusLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-            statusLabel.setMaximumSize(new Dimension(available ? 70 : 90, 22));
+            statusLabel.setMaximumSize(new Dimension(available ? 65 : 85, 20));
 
             info.add(titleLabel);
             info.add(authorLabel);
-            info.add(Box.createVerticalStrut(6));
+            info.add(Box.createVerticalStrut(5));
             info.add(statusLabel);
             info.add(Box.createVerticalGlue());
 
             // Link
             JLabel link = new JLabel("Lihat Selengkapnya →");
-            link.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+            link.setFont(new Font("Segoe UI", Font.PLAIN, 9));
             link.setForeground(ACCENT);
             link.setBorder(new EmptyBorder(5, 12, 0, 12));
             link.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
@@ -519,9 +532,14 @@ public class Dashboard extends JFrame {
         }
     }
 
-    // ============================================================
-    // DATA LOADING
-    // ============================================================
+    private String truncate(String text, int maxLength) {
+        if (text == null) {
+            return "";
+        }
+        return text.length() > maxLength ? text.substring(0, maxLength - 2) + ".." : text;
+    }
+
+    // ==================== DATA & ACTIONS ====================
     private void loadUserData() {
         try {
             com.mycompany.perpustakaan.api.DashboardSummary summary = libraryApi.getDashboardSummary(5);
@@ -535,23 +553,6 @@ public class Dashboard extends JFrame {
         } catch (SQLException e) {
             logger.log(java.util.logging.Level.SEVERE, "Gagal load user", e);
         }
-    }
-
-    // ============================================================
-    // MENU ACTIONS (placeholder - sesuaikan dengan logic lo)
-    // ============================================================
-    private void showBookshelf() {
-        contentPanel.removeAll();
-        contentPanel.add(new JLabel("Bookshelf Content", SwingConstants.CENTER));
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
-    private void showLoans() {
-        contentPanel.removeAll();
-        contentPanel.add(new JLabel("Loan Page Content", SwingConstants.CENTER));
-        contentPanel.revalidate();
-        contentPanel.repaint();
     }
 
     private void showProfile() {
@@ -574,21 +575,11 @@ public class Dashboard extends JFrame {
         }
     }
 
-    private void showHistory() {
-        contentPanel.removeAll();
-        contentPanel.add(new JLabel("History Content", SwingConstants.CENTER));
-        contentPanel.revalidate();
-        contentPanel.repaint();
-    }
-
     private void showError(String message, Exception exception) {
         JOptionPane.showMessageDialog(this, message + ": " + exception.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         logger.log(java.util.logging.Level.SEVERE, message, exception);
     }
 
-    // ============================================================
-    // MAIN
-    // ============================================================
     public static void main(String args[]) {
         java.awt.EventQueue.invokeLater(() -> new Dashboard().setVisible(true));
     }
