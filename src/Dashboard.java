@@ -674,13 +674,10 @@ public class Dashboard extends JFrame {
     }
 
     private void showAddBookDialog() {
-        saveBook(null);
-        if (isStaffOrAdmin()) {
-            showBookManagement();
-        }
+        showBookFormPage(null);
     }
 
-    private void saveBook(Integer idBuku) {
+    private void showBookFormPage(Integer idBuku) {
         JTextField kode = createField("");
         JTextField isbn = createField("");
         JTextField judul = createField("");
@@ -709,13 +706,35 @@ public class Dashboard extends JFrame {
             }
         }
 
-        JPanel panel = formPanel(
-                new String[]{"Kode", "ISBN", "Judul", "Penulis", "Penerbit", "Kategori", "Tahun", "Stok tersedia", "Stok total"},
+        resetContent();
+        addTitle(idBuku == null ? "Tambah Buku" : "Update Buku");
+
+        JPanel page = new JPanel(new BorderLayout(28, 0));
+        page.setOpaque(false);
+        page.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        page.add(createBookCoverPanel(260, 360), BorderLayout.WEST);
+
+        JPanel formCard = new JPanel();
+        formCard.setLayout(new BoxLayout(formCard, BoxLayout.Y_AXIS));
+        formCard.setBackground(WHITE);
+        formCard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_COLOR),
+                new EmptyBorder(22, 24, 22, 24)
+        ));
+
+        formCard.add(formPanel(
+                new String[]{"Kode Buku", "ISBN", "Judul", "Penulis", "Penerbit", "Kategori", "Tahun Terbit", "Stok Tersedia", "Stok Total"},
                 new JTextField[]{kode, isbn, judul, penulis, penerbit, kategori, tahun, stokTersedia, stokTotal}
-        );
-        String title = idBuku == null ? "Tambah Buku" : "Update Buku";
-        int result = JOptionPane.showConfirmDialog(this, panel, title, JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result == JOptionPane.OK_OPTION) {
+        ));
+        formCard.add(Box.createVerticalStrut(18));
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        actions.setOpaque(false);
+        JButton cancel = createNeutralButton("Kembali");
+        JButton save = createActionButton(idBuku == null ? "Tambah Buku" : "Simpan Perubahan");
+        cancel.addActionListener(e -> showBookManagement());
+        save.addActionListener(e -> {
             try {
                 Integer tahunValue = tahun.getText().trim().isEmpty() ? null : Integer.valueOf(tahun.getText().trim());
                 com.mycompany.perpustakaan.api.BookRequest request = new com.mycompany.perpustakaan.api.BookRequest(
@@ -723,17 +742,26 @@ public class Dashboard extends JFrame {
                         kategori.getText(), tahunValue, Integer.parseInt(stokTersedia.getText().trim()), Integer.parseInt(stokTotal.getText().trim()));
                 com.mycompany.perpustakaan.api.BookResponse response = idBuku == null ? libraryApi.addBook(request) : libraryApi.updateBook(idBuku, request);
                 showResponse(response.isSuccess(), response.getMessage());
-            } catch (SQLException | NumberFormatException e) {
-                showError("Gagal menyimpan buku", e);
+                if (response.isSuccess()) {
+                    showBookManagement();
+                }
+            } catch (SQLException | NumberFormatException exception) {
+                showError("Gagal menyimpan buku", exception);
             }
-        }
+        });
+        actions.add(cancel);
+        actions.add(save);
+        formCard.add(actions);
+
+        page.add(formCard, BorderLayout.CENTER);
+        contentPanel.add(page);
+        refreshContent();
     }
 
     private void updateSelectedBook(JTable table) {
         Integer id = selectedId(table);
         if (id != null) {
-            saveBook(id);
-            showBookManagement();
+            showBookFormPage(id);
         }
     }
 
@@ -744,16 +772,7 @@ public class Dashboard extends JFrame {
         }
         try {
             com.mycompany.perpustakaan.api.BookSummary book = libraryApi.getBookByIdForManagement(id);
-            JOptionPane.showMessageDialog(this,
-                    "Kode: " + book.getKodeBuku()
-                    + "\nISBN: " + safe(book.getIsbn())
-                    + "\nJudul: " + book.getJudul()
-                    + "\nPenulis: " + book.getPenulis()
-                    + "\nPenerbit: " + safe(book.getPenerbit())
-                    + "\nKategori: " + safe(book.getKategori())
-                    + "\nTahun: " + (book.getTahunTerbit() == null ? "-" : book.getTahunTerbit())
-                    + "\nStok: " + book.getStokTersedia() + "/" + book.getStokTotal(),
-                    "Detail Buku", JOptionPane.INFORMATION_MESSAGE);
+            showBookDetailPage(book, true);
         } catch (SQLException e) {
             showError("Gagal mengambil detail buku", e);
         }
@@ -764,19 +783,7 @@ public class Dashboard extends JFrame {
         if (id == null) {
             return;
         }
-        JTextField tersedia = createField("1");
-        JTextField total = createField("1");
-        JPanel panel = formPanel(new String[]{"Stok tersedia", "Stok total"}, new JTextField[]{tersedia, total});
-        int result = JOptionPane.showConfirmDialog(this, panel, "Update Stok", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (result == JOptionPane.OK_OPTION) {
-            try {
-                com.mycompany.perpustakaan.api.BookResponse response = libraryApi.updateBookStock(id, Integer.parseInt(tersedia.getText().trim()), Integer.parseInt(total.getText().trim()));
-                showResponse(response.isSuccess(), response.getMessage());
-                showBookManagement();
-            } catch (SQLException | NumberFormatException e) {
-                showError("Gagal update stok", e);
-            }
-        }
+        showStockPage(id);
     }
 
     private void deleteSelectedBook(JTable table) {
@@ -793,6 +800,151 @@ public class Dashboard extends JFrame {
             } catch (SQLException e) {
                 showError("Gagal hapus buku", e);
             }
+        }
+    }
+
+    private void showBookDetailPage(com.mycompany.perpustakaan.api.BookSummary book, boolean managementMode) {
+        if (book == null) {
+            return;
+        }
+        resetContent();
+        addTitle("Detail Buku");
+
+        JPanel page = new JPanel(new BorderLayout(34, 0));
+        page.setOpaque(false);
+        page.setAlignmentX(Component.LEFT_ALIGNMENT);
+        page.add(createBookCoverPanel(300, 420), BorderLayout.WEST);
+
+        JPanel detail = new JPanel();
+        detail.setLayout(new BoxLayout(detail, BoxLayout.Y_AXIS));
+        detail.setOpaque(false);
+        detail.setBorder(new EmptyBorder(16, 0, 0, 0));
+
+        JLabel title = new JLabel(safe(book.getJudul()));
+        title.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        title.setForeground(TEXT_DARK);
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+        detail.add(title);
+        detail.add(Box.createVerticalStrut(18));
+
+        detail.add(createDetailRow("Kode", safe(book.getKodeBuku())));
+        detail.add(createDetailRow("ISBN", safeOrDash(book.getIsbn())));
+        detail.add(createDetailRow("Author", safe(book.getPenulis())));
+        detail.add(createDetailRow("Penerbit", safeOrDash(book.getPenerbit())));
+        detail.add(createDetailRow("Published", book.getTahunTerbit() == null ? "-" : String.valueOf(book.getTahunTerbit())));
+        detail.add(createDetailRow("Kategori", safeOrDash(book.getKategori())));
+        detail.add(createDetailRow("Status", safeOrDash(book.getStatusKetersediaan())));
+        detail.add(Box.createVerticalStrut(8));
+        detail.add(createSynopsisBlock(book));
+        detail.add(Box.createVerticalStrut(12));
+
+        JPanel stockRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        stockRow.setOpaque(false);
+        stockRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JLabel stok = new JLabel("Stok: " + book.getStokTersedia() + " / " + book.getStokTotal());
+        stok.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        stok.setForeground(TEXT_DARK);
+        stockRow.add(stok);
+        if (managementMode && isStaffOrAdmin()) {
+            JButton updateStock = createActionButton("Update Stok");
+            updateStock.addActionListener(e -> showStockPage(book.getIdBuku()));
+            stockRow.add(updateStock);
+        }
+        detail.add(stockRow);
+        detail.add(Box.createVerticalGlue());
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        actions.setOpaque(false);
+        actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JButton back = createNeutralButton("Kembali");
+        back.addActionListener(e -> {
+            if (managementMode && isStaffOrAdmin()) {
+                showBookManagement();
+            } else {
+                showDashboard();
+            }
+        });
+        actions.add(back);
+        if (managementMode && isStaffOrAdmin()) {
+            JButton edit = createActionButton("Edit Buku");
+            edit.addActionListener(e -> showBookFormPage(book.getIdBuku()));
+            actions.add(edit);
+        } else if (!isStaffOrAdmin() && book.getStokTersedia() > 0) {
+            JButton request = createActionButton("Request Pinjam");
+            request.addActionListener(e -> requestLoanFromDetail(book.getIdBuku()));
+            actions.add(request);
+        }
+        detail.add(actions);
+
+        page.add(detail, BorderLayout.CENTER);
+        contentPanel.add(page);
+        refreshContent();
+    }
+
+    private void showStockPage(int idBuku) {
+        try {
+            com.mycompany.perpustakaan.api.BookSummary book = libraryApi.getBookByIdForManagement(idBuku);
+            resetContent();
+            addTitle("Update Stok Buku");
+
+            JPanel page = new JPanel(new BorderLayout(32, 0));
+            page.setOpaque(false);
+            page.setAlignmentX(Component.LEFT_ALIGNMENT);
+            page.add(createBookCoverPanel(280, 390), BorderLayout.WEST);
+
+            JPanel detail = new JPanel();
+            detail.setLayout(new BoxLayout(detail, BoxLayout.Y_AXIS));
+            detail.setOpaque(false);
+            detail.setBorder(new EmptyBorder(24, 0, 0, 0));
+
+            JLabel title = new JLabel(safe(book.getJudul()));
+            title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+            title.setForeground(TEXT_DARK);
+            title.setAlignmentX(Component.LEFT_ALIGNMENT);
+            detail.add(title);
+            detail.add(Box.createVerticalStrut(16));
+            detail.add(createDetailRow("Author", safe(book.getPenulis())));
+            detail.add(createDetailRow("Kategori", safeOrDash(book.getKategori())));
+            detail.add(createDetailRow("Kode", safe(book.getKodeBuku())));
+            detail.add(Box.createVerticalStrut(20));
+
+            JTextField tersedia = createStockField(book.getStokTersedia());
+            JTextField total = createStockField(book.getStokTotal());
+            detail.add(createStockControl("Stok Tersedia", tersedia));
+            detail.add(Box.createVerticalStrut(12));
+            detail.add(createStockControl("Stok Total", total));
+            detail.add(Box.createVerticalStrut(24));
+
+            JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+            actions.setOpaque(false);
+            actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+            JButton back = createNeutralButton("Kembali");
+            JButton save = createActionButton("Simpan Stok");
+            back.addActionListener(e -> showBookDetailPage(book, true));
+            save.addActionListener(e -> {
+                try {
+                    com.mycompany.perpustakaan.api.BookResponse response = libraryApi.updateBookStock(
+                            idBuku,
+                            Integer.parseInt(tersedia.getText().trim()),
+                            Integer.parseInt(total.getText().trim())
+                    );
+                    showResponse(response.isSuccess(), response.getMessage());
+                    if (response.isSuccess()) {
+                        showBookManagement();
+                    }
+                } catch (SQLException | NumberFormatException exception) {
+                    showError("Gagal update stok", exception);
+                }
+            });
+            actions.add(back);
+            actions.add(save);
+            detail.add(actions);
+
+            page.add(detail, BorderLayout.CENTER);
+            contentPanel.add(page);
+            refreshContent();
+        } catch (SQLException e) {
+            showError("Gagal membuka update stok", e);
         }
     }
 
@@ -842,6 +994,22 @@ public class Dashboard extends JFrame {
                 com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.requestLoan(id, Integer.parseInt(hari.getText().trim()));
                 showResponse(response.isSuccess(), response.getMessage());
                 showCurrentLoans();
+            } catch (SQLException | NumberFormatException e) {
+                showError("Gagal request peminjaman", e);
+            }
+        }
+    }
+
+    private void requestLoanFromDetail(int idBuku) {
+        JTextField hari = createField("7");
+        int result = JOptionPane.showConfirmDialog(this, hari, "Lama pinjam (hari)", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.requestLoan(idBuku, Integer.parseInt(hari.getText().trim()));
+                showResponse(response.isSuccess(), response.getMessage());
+                if (response.isSuccess()) {
+                    showCurrentLoans();
+                }
             } catch (SQLException | NumberFormatException e) {
                 showError("Gagal request peminjaman", e);
             }
@@ -979,10 +1147,10 @@ public class Dashboard extends JFrame {
 
         HorizontalScrollPanel scrollPanel = new HorizontalScrollPanel();
         if (books == null || books.isEmpty()) {
-            scrollPanel.addCard("Belum ada buku", "Data belum tersedia", false);
+            scrollPanel.addCard(null);
         } else {
             for (com.mycompany.perpustakaan.api.BookSummary book : books) {
-                scrollPanel.addCard(book.getJudul(), book.getPenulis(), book.getStokTersedia() > 0);
+                scrollPanel.addCard(book);
             }
         }
         section.add(scrollPanel);
@@ -1047,17 +1215,22 @@ public class Dashboard extends JFrame {
             add(arrowPanel, BorderLayout.EAST);
         }
 
-        void addCard(String title, String author, boolean available) {
-            cardsContainer.add(new BookCard(title, author, available));
+        void addCard(com.mycompany.perpustakaan.api.BookSummary book) {
+            cardsContainer.add(new BookCard(book));
         }
     }
 
     private class BookCard extends JPanel {
-        BookCard(String title, String author, boolean available) {
+        BookCard(com.mycompany.perpustakaan.api.BookSummary book) {
+            String title = book == null ? "Belum ada buku" : book.getJudul();
+            String author = book == null ? "Data belum tersedia" : book.getPenulis();
+            boolean available = book != null && book.getStokTersedia() > 0;
+
             setPreferredSize(CARD_SIZE);
             setBackground(WHITE);
             setLayout(new BorderLayout());
             setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1), new EmptyBorder(0, 0, 10, 0)));
+            setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
 
             JLabel cover = new JLabel();
             ImageIcon placeholder = loadBookCoverPlaceholder();
@@ -1105,6 +1278,16 @@ public class Dashboard extends JFrame {
             link.setForeground(ACCENT);
             link.setBorder(new EmptyBorder(5, 12, 0, 12));
             link.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+            MouseAdapter openDetail = new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (book != null) {
+                        showBookDetailPage(book, false);
+                    }
+                }
+            };
+            addMouseListener(openDetail);
+            link.addMouseListener(openDetail);
 
             add(cover, BorderLayout.NORTH);
             add(info, BorderLayout.CENTER);
@@ -1179,8 +1362,12 @@ public class Dashboard extends JFrame {
     private JPanel formPanel(String[] labels, JTextField[] fields) {
         JPanel panel = new JPanel(new GridLayout(labels.length, 2, 10, 8));
         panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        panel.setOpaque(false);
         for (int i = 0; i < labels.length; i++) {
-            panel.add(new JLabel(labels[i]));
+            JLabel label = new JLabel(labels[i]);
+            label.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            label.setForeground(TEXT_DARK);
+            panel.add(label);
             panel.add(fields[i]);
         }
         return panel;
@@ -1190,6 +1377,56 @@ public class Dashboard extends JFrame {
         JTextField field = new JTextField(value);
         field.setPreferredSize(new Dimension(180, 32));
         return field;
+    }
+
+    private JTextField createStockField(int value) {
+        JTextField field = createField(String.valueOf(value));
+        field.setHorizontalAlignment(SwingConstants.CENTER);
+        field.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        field.setMaximumSize(new Dimension(90, 38));
+        return field;
+    }
+
+    private JPanel createStockControl(String labelText, JTextField field) {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        row.setOpaque(false);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel label = new JLabel(labelText + ":");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        label.setForeground(TEXT_DARK);
+
+        JButton minus = createRoundStockButton("-");
+        JButton plus = createRoundStockButton("+");
+        minus.addActionListener(e -> adjustStockField(field, -1));
+        plus.addActionListener(e -> adjustStockField(field, 1));
+
+        row.add(label);
+        row.add(minus);
+        row.add(field);
+        row.add(plus);
+        return row;
+    }
+
+    private JButton createRoundStockButton(String text) {
+        JButton button = new JButton(text);
+        button.setPreferredSize(new Dimension(30, 30));
+        button.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        button.setForeground(TEXT_DARK);
+        button.setBackground(new Color(238, 238, 238));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createLineBorder(TEXT_GRAY, 1));
+        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        return button;
+    }
+
+    private void adjustStockField(JTextField field, int delta) {
+        try {
+            int current = Integer.parseInt(field.getText().trim());
+            field.setText(String.valueOf(Math.max(0, current + delta)));
+        } catch (NumberFormatException e) {
+            field.setText("0");
+        }
     }
 
     private JButton createActionButton(String text) {
@@ -1204,6 +1441,88 @@ public class Dashboard extends JFrame {
         button.setBorder(new EmptyBorder(8, 14, 8, 14));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         return button;
+    }
+
+    private JButton createNeutralButton(String text) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        button.setForeground(TEXT_DARK);
+        button.setBackground(new Color(245, 245, 245));
+        button.setFocusPainted(false);
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(TEXT_GRAY, 1),
+                new EmptyBorder(8, 18, 8, 18)
+        ));
+        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        return button;
+    }
+
+    private JPanel createBookCoverPanel(int width, int height) {
+        JPanel cover = new JPanel(new BorderLayout());
+        cover.setPreferredSize(new Dimension(width, height));
+        cover.setMaximumSize(new Dimension(width, height));
+        cover.setBackground(WHITE);
+        cover.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(TEXT_GRAY, 1),
+                new EmptyBorder(18, 18, 18, 18)
+        ));
+
+        JLabel image = new JLabel();
+        ImageIcon placeholder = loadBookCoverPlaceholder();
+        if (placeholder != null) {
+            Image scaled = placeholder.getImage().getScaledInstance(Math.min(130, width - 60), Math.min(110, height - 80), Image.SCALE_SMOOTH);
+            image.setIcon(new ImageIcon(scaled));
+        } else {
+            image.setText("No Image");
+            image.setForeground(TEXT_GRAY);
+            image.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        }
+        image.setHorizontalAlignment(SwingConstants.CENTER);
+        cover.add(image, BorderLayout.CENTER);
+        return cover;
+    }
+
+    private JPanel createDetailRow(String labelText, String valueText) {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        row.setOpaque(false);
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel label = new JLabel(labelText + " :");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        label.setForeground(TEXT_DARK);
+
+        JLabel value = new JLabel(valueText == null || valueText.isBlank() ? "-" : valueText);
+        value.setFont(new Font("Segoe UI", Font.PLAIN, 17));
+        value.setForeground(TEXT_DARK);
+
+        row.add(label);
+        row.add(value);
+        return row;
+    }
+
+    private JPanel createSynopsisBlock(com.mycompany.perpustakaan.api.BookSummary book) {
+        JPanel block = new JPanel();
+        block.setLayout(new BoxLayout(block, BoxLayout.Y_AXIS));
+        block.setOpaque(false);
+        block.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel label = new JLabel("Sinopsis :");
+        label.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        label.setForeground(TEXT_DARK);
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        String text = "Detail sinopsis belum tersedia di data buku. Buku ini berada pada kategori "
+                + safeOrDash(book.getKategori()) + ", ditulis oleh " + safeOrDash(book.getPenulis())
+                + ", dan saat ini memiliki stok " + book.getStokTersedia() + " dari total " + book.getStokTotal() + ".";
+        JLabel synopsis = new JLabel("<html><div style='width:560px;'>" + escapeHtml(text) + "</div></html>");
+        synopsis.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        synopsis.setForeground(TEXT_DARK);
+        synopsis.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        block.add(label);
+        block.add(Box.createVerticalStrut(4));
+        block.add(synopsis);
+        return block;
     }
 
     private class GradientActionButton extends JButton {
@@ -1493,8 +1812,22 @@ public class Dashboard extends JFrame {
         return value == null ? "" : value;
     }
 
+    private String safeOrDash(String value) {
+        return value == null || value.trim().isEmpty() ? "-" : value;
+    }
+
     private String blankToNull(String value) {
         return value == null || value.trim().isEmpty() ? null : value.trim();
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 
     private void showResponse(boolean success, String message) {
