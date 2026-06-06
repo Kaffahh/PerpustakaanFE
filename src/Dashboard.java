@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.swing.BorderFactory;
@@ -169,7 +170,6 @@ public class Dashboard extends JFrame {
                 addMenuButton("Loan Report", "/assets/icons/icon-loan-report.svg", e -> showLoanReport());
                 addMenuButton("Buku Populer", "/assets/icons/icon-history.png", e -> showPopularBookReport());
                 addMenuButton("Tambah Buku", "/assets/icons/icon-loan.png", e -> showAddBookDialog());
-                addMenuButton("Kunjungan", "/assets/icons/icon-visit.svg", e -> showVisitManagement());
             }
 
             if (isStaffOrAdmin()) {
@@ -825,51 +825,331 @@ private JPanel createReportInfoRow(String labelText, String valueText) {
     }
 
     private void showBookManagement() {
-        if (!requireStaffOrAdminView()) {
-            return;
-        }
-        resetContent();
-        addTitle("Manajemen Buku");
-        addQuickActions(new String[] { "Tambah Buku", "Refresh" },
-                new Runnable[] { this::showAddBookDialog, this::showBookManagement });
+    if (!requireStaffOrAdminView()) {
+        return;
+    }
+
+    resetContent();
+    addTitle("Manajemen Buku");
+
+    addDashboardHero(
+            "Kelola Koleksi Buku",
+            "Tambah, edit, pantau stok, dan kelola status buku perpustakaan dari satu halaman."
+    );
+
+    JTextField search = createModernSearchField("Cari judul / penulis / kode buku...");
+    JComboBox<String> statusFilter = new JComboBox<>(new String[]{"Semua Status", "Tersedia", "Habis"});
+    statusFilter.setPreferredSize(new Dimension(150, 38));
+    statusFilter.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
+    JPanel summaryHolder = createDynamicContentPanel();
+    JPanel tableHolder = createDynamicContentPanel();
+    JPanel actionHolder = createDynamicContentPanel();
+
+    final Runnable[] render = new Runnable[1];
+    render[0] = () -> {
+        summaryHolder.removeAll();
+        tableHolder.removeAll();
+        actionHolder.removeAll();
         try {
-            com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage("", "", 1, 50);
-            DefaultTableModel model = new DefaultTableModel(
-                    new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Stok", "Status" }, 0);
-            for (com.mycompany.perpustakaan.api.BookSummary book : page.getBooks()) {
-                model.addRow(new Object[] {
-                        book.getIdBuku(),
-                        book.getKodeBuku(),
-                        book.getJudul(),
-                        book.getPenulis(),
-                        book.getKategori(),
-                        book.getStokTersedia() + "/" + book.getStokTotal(),
-                        book.getStatusKetersediaan()
-                });
-            }
-            JTable table = createTable(model);
-            contentPanel.add(wrapTable(table, 520));
+            String keyword = searchText(search, "Cari judul / penulis / kode buku...");
+            com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage(keyword, "", 1, 100);
+            List<com.mycompany.perpustakaan.api.BookSummary> books = filterBooksByStatus(
+                    page.getBooks(),
+                    statusFilter.getSelectedItem() == null ? "Semua Status" : statusFilter.getSelectedItem().toString()
+            );
 
-            JPanel actions = createToolbarPanel();
-            JButton detail = createActionButton("Detail");
-            JButton update = createActionButton("Update");
-            JButton stock = createActionButton("Update Stok");
-            JButton delete = createActionButton("Hapus");
-            actions.add(detail);
-            actions.add(update);
-            actions.add(stock);
-            actions.add(delete);
-            contentPanel.add(actions);
+            summaryHolder.add(createBookManagementSummaryPanel(books));
+            summaryHolder.add(Box.createVerticalStrut(20));
 
-            detail.addActionListener(e -> showSelectedBookDetail(table));
-            update.addActionListener(e -> updateSelectedBook(table));
-            stock.addActionListener(e -> updateSelectedStock(table));
-            delete.addActionListener(e -> deleteSelectedBook(table));
+            JTable table = createTable(createBookManagementTableModel(books));
+            tableHolder.add(createBookManagementTableCard(table));
+            tableHolder.add(Box.createVerticalStrut(14));
+            actionHolder.add(createBookManagementActions(table));
+            refreshContent();
         } catch (SQLException e) {
             showError("Gagal memuat manajemen buku", e);
         }
-        refreshContent();
+    };
+
+    JPanel toolbar = createBookManagementToolbar(search, statusFilter, render[0]);
+    contentPanel.add(summaryHolder);
+    contentPanel.add(toolbar);
+    contentPanel.add(Box.createVerticalStrut(16));
+    contentPanel.add(tableHolder);
+    contentPanel.add(actionHolder);
+
+    search.addActionListener(e -> render[0].run());
+    statusFilter.addActionListener(e -> render[0].run());
+    render[0].run();
+
+    refreshContent();
+}
+
+private void addBookManagementSummary(List<com.mycompany.perpustakaan.api.BookSummary> books) {
+    contentPanel.add(createBookManagementSummaryPanel(books));
+    contentPanel.add(Box.createVerticalStrut(20));
+}
+
+private JPanel createBookManagementSummaryPanel(List<com.mycompany.perpustakaan.api.BookSummary> books) {
+    int total = books == null ? 0 : books.size();
+    int tersedia = 0;
+    int habis = 0;
+    int stokTotal = 0;
+
+    if (books != null) {
+        for (com.mycompany.perpustakaan.api.BookSummary book : books) {
+            stokTotal += book.getStokTotal();
+
+            if (book.getStokTersedia() > 0) {
+                tersedia++;
+            } else {
+                habis++;
+            }
+        }
     }
+
+    JPanel row = new JPanel(new GridLayout(1, 4, 18, 0));
+    row.setOpaque(false);
+    row.setAlignmentX(Component.LEFT_ALIGNMENT);
+    row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 112));
+
+    row.add(createMetricCard("Total Buku", String.valueOf(total)));
+    row.add(createMetricCard("Buku Tersedia", String.valueOf(tersedia)));
+    row.add(createMetricCard("Stok Habis", String.valueOf(habis)));
+    row.add(createMetricCard("Total Stok", String.valueOf(stokTotal)));
+
+    return row;
+}
+
+private JPanel createBookManagementToolbar(JTextField search, JComboBox<String> statusFilter, Runnable render) {
+    JPanel toolbar = new RoundedPanel(24, WHITE, CARD_BORDER, 1f);
+    toolbar.setLayout(new BorderLayout(16, 0));
+    toolbar.setBorder(new EmptyBorder(16, 18, 16, 18));
+    toolbar.setAlignmentX(Component.LEFT_ALIGNMENT);
+    toolbar.setMaximumSize(new Dimension(Integer.MAX_VALUE, 76));
+
+    JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+    left.setOpaque(false);
+
+    JButton searchButton = createActionButton("Cari");
+    searchButton.addActionListener(e -> render.run());
+
+    left.add(search);
+    left.add(statusFilter);
+    left.add(searchButton);
+
+    JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+    right.setOpaque(false);
+
+    JButton add = createActionButton("Tambah Buku");
+    JButton refresh = createNeutralButton("Refresh");
+
+    add.addActionListener(e -> showAddBookDialog());
+    refresh.addActionListener(e -> {
+        search.setText("Cari judul / penulis / kode buku...");
+        search.setForeground(TEXT_GRAY);
+        statusFilter.setSelectedItem("Semua Status");
+        render.run();
+    });
+
+    right.add(refresh);
+    right.add(add);
+
+    toolbar.add(left, BorderLayout.WEST);
+    toolbar.add(right, BorderLayout.EAST);
+
+    return toolbar;
+}
+
+private List<com.mycompany.perpustakaan.api.BookSummary> filterBooksByStatus(
+        List<com.mycompany.perpustakaan.api.BookSummary> books,
+        String status
+) {
+    if (books == null || books.isEmpty() || status == null || "Semua Status".equalsIgnoreCase(status)) {
+        return books;
+    }
+
+    List<com.mycompany.perpustakaan.api.BookSummary> filtered = new ArrayList<>();
+    for (com.mycompany.perpustakaan.api.BookSummary book : books) {
+        boolean available = book.getStokTersedia() > 0;
+        if (("Tersedia".equalsIgnoreCase(status) && available)
+                || ("Habis".equalsIgnoreCase(status) && !available)) {
+            filtered.add(book);
+        }
+    }
+    return filtered;
+}
+
+    private JTextField createModernSearchField(String placeholder) {
+        JTextField field = new JTextField(placeholder);
+    field.setPreferredSize(new Dimension(310, 38));
+    field.setMaximumSize(new Dimension(310, 38));
+    field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+    field.setForeground(TEXT_GRAY);
+    field.setBackground(WHITE);
+    field.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(CARD_BORDER),
+            new EmptyBorder(8, 13, 8, 13)
+    ));
+
+    field.addFocusListener(new java.awt.event.FocusAdapter() {
+        @Override
+        public void focusGained(java.awt.event.FocusEvent e) {
+            if (field.getText().equals(placeholder)) {
+                field.setText("");
+                field.setForeground(TEXT_DARK);
+            }
+        }
+
+        @Override
+        public void focusLost(java.awt.event.FocusEvent e) {
+            if (field.getText().trim().isEmpty()) {
+                field.setText(placeholder);
+                field.setForeground(TEXT_GRAY);
+            }
+        }
+    });
+
+    return field;
+}
+
+private String searchText(JTextField field, String placeholder) {
+    if (field == null) {
+        return "";
+    }
+    String value = field.getText() == null ? "" : field.getText().trim();
+    return value.equals(placeholder) ? "" : value;
+}
+
+private DefaultTableModel createBookManagementTableModel(List<com.mycompany.perpustakaan.api.BookSummary> books) {
+    DefaultTableModel model = new DefaultTableModel(
+            new Object[]{"ID", "Kode", "Judul", "Penulis", "Kategori", "Stok", "Status"},
+            0
+    );
+
+    if (books == null || books.isEmpty()) {
+        model.addRow(new Object[]{"-", "-", "Belum ada data buku", "-", "-", "-", "-"});
+        return model;
+    }
+
+    for (com.mycompany.perpustakaan.api.BookSummary book : books) {
+        model.addRow(new Object[]{
+                book.getIdBuku(),
+                safeOrDash(book.getKodeBuku()),
+                safeOrDash(book.getJudul()),
+                safeOrDash(book.getPenulis()),
+                safeOrDash(book.getKategori()),
+                book.getStokTersedia() + " / " + book.getStokTotal(),
+                safeOrDash(book.getStatusKetersediaan())
+        });
+    }
+
+    return model;
+}
+
+private JPanel createBookManagementTableCard(JTable table) {
+    JPanel card = new RoundedPanel(26, WHITE, CARD_BORDER, 1f);
+    card.setLayout(new BorderLayout());
+    card.setBorder(new EmptyBorder(20, 22, 22, 22));
+    card.setAlignmentX(Component.LEFT_ALIGNMENT);
+    card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 560));
+
+    JPanel header = new JPanel(new BorderLayout());
+    header.setOpaque(false);
+
+    JPanel titleBox = new JPanel();
+    titleBox.setOpaque(false);
+    titleBox.setLayout(new BoxLayout(titleBox, BoxLayout.Y_AXIS));
+
+    JLabel title = new JLabel("Daftar Koleksi Buku");
+    title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+    title.setForeground(TEXT_DARK);
+
+    JLabel subtitle = new JLabel("Pilih salah satu buku untuk melihat detail, mengedit data, mengubah stok, atau menghapus buku.");
+    subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+    subtitle.setForeground(TEXT_GRAY);
+
+    titleBox.add(title);
+    titleBox.add(Box.createVerticalStrut(4));
+    titleBox.add(subtitle);
+
+    JLabel badge = new JLabel("BOOK DATA");
+    badge.setFont(new Font("Segoe UI", Font.BOLD, 11));
+    badge.setForeground(ACCENT_DARK);
+    badge.setOpaque(true);
+    badge.setBackground(ACCENT_SOFT);
+    badge.setBorder(new EmptyBorder(7, 12, 7, 12));
+
+    header.add(titleBox, BorderLayout.WEST);
+    header.add(badge, BorderLayout.EAST);
+
+    JScrollPane scroll = new JScrollPane(table);
+    scroll.setPreferredSize(new Dimension(1300, 420));
+    scroll.setBorder(null);
+    scroll.getViewport().setBackground(WHITE);
+
+    card.add(header, BorderLayout.NORTH);
+    card.add(Box.createVerticalStrut(14), BorderLayout.CENTER);
+
+    JPanel tableWrap = new JPanel(new BorderLayout());
+    tableWrap.setOpaque(false);
+    tableWrap.setBorder(new EmptyBorder(18, 0, 0, 0));
+    tableWrap.add(scroll, BorderLayout.CENTER);
+
+    card.add(tableWrap, BorderLayout.CENTER);
+
+    return card;
+}
+
+private JPanel createBookManagementActions(JTable table) {
+    JPanel actions = new RoundedPanel(22, WHITE, CARD_BORDER, 1f);
+    actions.setLayout(new BorderLayout());
+    actions.setBorder(new EmptyBorder(14, 18, 14, 18));
+    actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+    actions.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+
+    JLabel hint = new JLabel("Pilih data buku pada tabel terlebih dahulu sebelum menjalankan aksi.");
+    hint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+    hint.setForeground(TEXT_GRAY);
+
+    JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+    buttons.setOpaque(false);
+
+    JButton detail = createNeutralButton("Detail");
+    JButton update = createActionButton("Edit");
+    JButton stock = createActionButton("Update Stok");
+    JButton delete = createDangerButton("Hapus");
+
+    detail.addActionListener(e -> showSelectedBookDetail(table));
+    update.addActionListener(e -> updateSelectedBook(table));
+    stock.addActionListener(e -> updateSelectedStock(table));
+    delete.addActionListener(e -> deleteSelectedBook(table));
+
+    buttons.add(detail);
+    buttons.add(update);
+    buttons.add(stock);
+    buttons.add(delete);
+
+    actions.add(hint, BorderLayout.WEST);
+    actions.add(buttons, BorderLayout.EAST);
+
+    return actions;
+}
+
+private JButton createDangerButton(String text) {
+    JButton button = new GradientActionButton(text);
+    button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+    button.setForeground(WHITE);
+    button.setBackground(new Color(220, 72, 72));
+    button.setFocusPainted(false);
+    button.setContentAreaFilled(false);
+    button.setBorderPainted(false);
+    button.setOpaque(false);
+    button.setBorder(new EmptyBorder(10, 17, 10, 17));
+    button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+    return button;
+}
 
     private void showLoanManagement() {
         if (!requireStaffOrAdminView()) {
@@ -936,41 +1216,107 @@ private JPanel createReportInfoRow(String labelText, String valueText) {
         }
         resetContent();
         addTitle("Member Management");
-        addQuickActions(new String[] { "Tambah Anggota", "Refresh" },
-                new Runnable[] { this::showAddMemberDialog, this::showMemberManagement });
-        try {
-            com.mycompany.perpustakaan.api.MemberPage page = libraryApi.searchMembers("", "semua", 1, 50);
-            DefaultTableModel model = new DefaultTableModel(
-                    new Object[] { "ID", "Nama", "Username", "Email", "Status" }, 0);
-            for (com.mycompany.perpustakaan.api.MemberSummary member : page.getMembers()) {
-                model.addRow(new Object[] {
-                        member.getIdUser(),
-                        member.getNama(),
-                        member.getUsername(),
-                        member.getEmail(),
-                        member.getStatusAkun()
-                });
+
+        JTextField search = createModernSearchField("Cari nama / username / email...");
+        JComboBox<String> status = new JComboBox<>(new String[] { "semua", "aktif", "suspend" });
+        status.setPreferredSize(new Dimension(150, 38));
+        status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
+        JPanel toolbar = createMemberManagementToolbar(search, status);
+        JPanel tableHolder = createDynamicContentPanel();
+        JPanel actionHolder = createDynamicContentPanel();
+
+        final Runnable[] render = new Runnable[1];
+        render[0] = () -> {
+            tableHolder.removeAll();
+            actionHolder.removeAll();
+            try {
+                String keyword = searchText(search, "Cari nama / username / email...");
+                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                com.mycompany.perpustakaan.api.MemberPage page = libraryApi.searchMembers(keyword, selectedStatus, 1, 50);
+                DefaultTableModel model = createMemberManagementTableModel(page.getMembers());
+                JTable table = createTable(model);
+                tableHolder.add(wrapTable(table, 520));
+
+                JPanel actions = createToolbarPanel();
+                JButton update = createActionButton("Update");
+                JButton suspend = createActionButton("Suspend");
+                JButton activate = createActionButton("Aktifkan");
+                JButton delete = createDangerButton("Hapus");
+                update.addActionListener(e -> updateSelectedMember(table));
+                suspend.addActionListener(e -> changeSelectedMemberStatus(table, true));
+                activate.addActionListener(e -> changeSelectedMemberStatus(table, false));
+                delete.addActionListener(e -> deleteSelectedMember(table));
+                actions.add(update);
+                actions.add(suspend);
+                actions.add(activate);
+                actions.add(delete);
+                actionHolder.add(actions);
+                refreshContent();
+            } catch (SQLException e) {
+                showError("Gagal memuat member management", e);
             }
-            JTable table = createTable(model);
-            contentPanel.add(wrapTable(table, 520));
-            JPanel actions = createToolbarPanel();
-            JButton update = createActionButton("Update");
-            JButton suspend = createActionButton("Suspend");
-            JButton activate = createActionButton("Aktifkan");
-            JButton delete = createActionButton("Hapus");
-            actions.add(update);
-            actions.add(suspend);
-            actions.add(activate);
-            actions.add(delete);
-            contentPanel.add(actions);
-            update.addActionListener(e -> updateSelectedMember(table));
-            suspend.addActionListener(e -> changeSelectedMemberStatus(table, true));
-            activate.addActionListener(e -> changeSelectedMemberStatus(table, false));
-            delete.addActionListener(e -> deleteSelectedMember(table));
-        } catch (SQLException e) {
-            showError("Gagal memuat member management", e);
-        }
+        };
+
+        JButton searchButton = (JButton) toolbar.getClientProperty("searchButton");
+        JButton refreshButton = (JButton) toolbar.getClientProperty("refreshButton");
+        JButton addButton = (JButton) toolbar.getClientProperty("addButton");
+        searchButton.addActionListener(e -> render[0].run());
+        refreshButton.addActionListener(e -> {
+            search.setText("Cari nama / username / email...");
+            search.setForeground(TEXT_GRAY);
+            status.setSelectedItem("semua");
+            render[0].run();
+        });
+        addButton.addActionListener(e -> showAddMemberDialog());
+        search.addActionListener(e -> render[0].run());
+        status.addActionListener(e -> render[0].run());
+
+        contentPanel.add(toolbar);
+        contentPanel.add(Box.createVerticalStrut(15));
+        contentPanel.add(tableHolder);
+        contentPanel.add(actionHolder);
+        render[0].run();
         refreshContent();
+    }
+
+    private JPanel createMemberManagementToolbar(JTextField search, JComboBox<String> status) {
+        JPanel toolbar = createToolbarPanel();
+        JButton searchButton = createActionButton("Cari");
+        JButton refreshButton = createNeutralButton("Refresh");
+        JButton addButton = createActionButton("Tambah Anggota");
+
+        toolbar.add(search);
+        toolbar.add(new JLabel("Status"));
+        toolbar.add(status);
+        toolbar.add(searchButton);
+        toolbar.add(refreshButton);
+        toolbar.add(addButton);
+
+        toolbar.putClientProperty("searchButton", searchButton);
+        toolbar.putClientProperty("refreshButton", refreshButton);
+        toolbar.putClientProperty("addButton", addButton);
+        return toolbar;
+    }
+
+    private DefaultTableModel createMemberManagementTableModel(List<com.mycompany.perpustakaan.api.MemberSummary> members) {
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[] { "ID", "Nama", "Username", "Email", "Status" }, 0);
+        if (members == null || members.isEmpty()) {
+            model.addRow(new Object[] { "-", "Tidak ada anggota yang cocok", "-", "-", "-" });
+            return model;
+        }
+
+        for (com.mycompany.perpustakaan.api.MemberSummary member : members) {
+            model.addRow(new Object[] {
+                    member.getIdUser(),
+                    member.getNama(),
+                    member.getUsername(),
+                    member.getEmail(),
+                    member.getStatusAkun()
+            });
+        }
+        return model;
     }
 
     private void showPendingLoanRequests() {
@@ -1348,18 +1694,21 @@ private JPanel createReportInfoRow(String labelText, String valueText) {
             return;
         }
 
-        JOptionPane.showMessageDialog(
-                this,
-                "Data kunjungan manual siap disimpan:\n\n"
-                        + "Nama: " + nama.getText().trim() + "\n"
-                        + "Jenis: " + jenis.getText().trim() + "\n"
-                        + "Asal: " + asal.getText().trim() + "\n"
-                        + "Keperluan: " + keperluan.getText().trim() + "\n\n"
-                        + "Tinggal sambungkan ke method API/DAO kunjungan manual.",
-                "Kunjungan Manual",
-                JOptionPane.INFORMATION_MESSAGE);
+        try {
+            com.mycompany.perpustakaan.api.VisitResponse response = libraryApi.addManualVisit(
+                    nama.getText().trim(),
+                    jenis.getText().trim(),
+                    asal.getText().trim(),
+                    keperluan.getText().trim());
 
-        showVisitManagement();
+            showResponse(response.isSuccess(), response.getMessage());
+
+            if (response.isSuccess()) {
+                showVisitManagement();
+            }
+        } catch (SQLException e) {
+            showError("Gagal menambah kunjungan manual", e);
+        }
     }
 
     private void showVisitManagement() {
@@ -1389,10 +1738,29 @@ private JPanel createReportInfoRow(String labelText, String valueText) {
         contentPanel.add(Box.createVerticalStrut(16));
 
         DefaultTableModel model = new DefaultTableModel(
-                new Object[] { "No", "Nama Pengunjung", "Jenis", "Asal Instansi", "Keperluan", "Tanggal" },
+                new Object[] { "ID", "Nama Pengunjung", "Jenis", "Asal Instansi", "Keperluan", "Status", "Tanggal" },
                 0);
 
-        model.addRow(new Object[] { "-", "Belum ada data", "-", "-", "-", "-" });
+        try {
+            List<com.mycompany.perpustakaan.api.VisitSummary> visits = libraryApi.getRecentVisits(100);
+            if (visits.isEmpty()) {
+                model.addRow(new Object[] { "-", "Belum ada data", "-", "-", "-", "-", "-" });
+            } else {
+                for (com.mycompany.perpustakaan.api.VisitSummary visit : visits) {
+                    model.addRow(new Object[] {
+                            visit.getIdKunjungan(),
+                            safeOrDash(visit.getNamaPengunjung()),
+                            safeOrDash(visit.getJenisPengunjung()),
+                            safeOrDash(visit.getAsalInstansi()),
+                            safeOrDash(visit.getKeperluan()),
+                            safeOrDash(visit.getStatusKunjungan()),
+                            safeOrDash(visit.getTanggalKunjungan())
+                    });
+                }
+            }
+        } catch (SQLException e) {
+            showError("Gagal memuat data kunjungan", e);
+        }
 
         contentPanel.add(createTablePanel(model, 420));
 
@@ -1763,82 +2131,188 @@ private JPanel createModernBookCoverPanel(String labelText, int width, int heigh
     }
 
     private void showBookDetailPage(com.mycompany.perpustakaan.api.BookSummary book, boolean managementMode) {
-        if (book == null) {
-            return;
-        }
-        resetContent();
-        addTitle("Detail Buku");
-
-        JPanel page = new JPanel(new BorderLayout(34, 0));
-        page.setOpaque(false);
-        page.setAlignmentX(Component.LEFT_ALIGNMENT);
-        page.add(createModernBookCoverPanel("Detail Buku", 320, 460), BorderLayout.WEST);
-
-        JPanel detail = new JPanel();
-        detail.setLayout(new BoxLayout(detail, BoxLayout.Y_AXIS));
-        detail.setOpaque(false);
-        detail.setBorder(new EmptyBorder(16, 0, 0, 0));
-
-        JLabel title = new JLabel(safe(book.getJudul()));
-        title.setFont(new Font("Segoe UI", Font.BOLD, 28));
-        title.setForeground(TEXT_DARK);
-        title.setAlignmentX(Component.LEFT_ALIGNMENT);
-        detail.add(title);
-        detail.add(Box.createVerticalStrut(18));
-
-        detail.add(createDetailRow("Kode", safe(book.getKodeBuku())));
-        detail.add(createDetailRow("Author", safe(book.getPenulis())));
-        detail.add(createDetailRow("Penerbit", safeOrDash(book.getPenerbit())));
-        detail.add(createDetailRow("Published",
-                book.getTahunTerbit() == null ? "-" : String.valueOf(book.getTahunTerbit())));
-        detail.add(createDetailRow("Kategori", safeOrDash(book.getKategori())));
-        detail.add(createDetailRow("Status", safeOrDash(book.getStatusKetersediaan())));
-        detail.add(Box.createVerticalStrut(8));
-        detail.add(createSynopsisBlock(book));
-        detail.add(Box.createVerticalStrut(12));
-
-        JPanel stockRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        stockRow.setOpaque(false);
-        stockRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JLabel stok = new JLabel("Stok: " + book.getStokTersedia() + " / " + book.getStokTotal());
-        stok.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        stok.setForeground(TEXT_DARK);
-        stockRow.add(stok);
-        if (managementMode && isStaffOrAdmin()) {
-            JButton updateStock = createActionButton("Update Stok");
-            updateStock.addActionListener(e -> showStockPage(book.getIdBuku()));
-            stockRow.add(updateStock);
-        }
-        detail.add(stockRow);
-        detail.add(Box.createVerticalGlue());
-
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        actions.setOpaque(false);
-        actions.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JButton back = createNeutralButton("Kembali");
-        back.addActionListener(e -> {
-            if (managementMode && isStaffOrAdmin()) {
-                showBookManagement();
-            } else {
-                showDashboard();
-            }
-        });
-        actions.add(back);
-        if (managementMode && isStaffOrAdmin()) {
-            JButton edit = createActionButton("Edit Buku");
-            edit.addActionListener(e -> showBookFormPage(book.getIdBuku()));
-            actions.add(edit);
-        } else if (!isStaffOrAdmin() && book.getStokTersedia() > 0) {
-            JButton request = createActionButton("Request Pinjam");
-            request.addActionListener(e -> requestLoanFromDetail(book.getIdBuku()));
-            actions.add(request);
-        }
-        detail.add(actions);
-
-        page.add(detail, BorderLayout.CENTER);
-        contentPanel.add(page);
-        refreshContent();
+    if (book == null) {
+        return;
     }
+
+    resetContent();
+    addTitle("Detail Buku");
+
+    addDashboardHero(
+            safeOrDash(book.getJudul()),
+            "Informasi lengkap buku, stok, kategori, dan status ketersediaan koleksi."
+    );
+
+    JPanel page = new JPanel(new BorderLayout(30, 0));
+    page.setOpaque(false);
+    page.setAlignmentX(Component.LEFT_ALIGNMENT);
+    page.setMaximumSize(new Dimension(Integer.MAX_VALUE, 560));
+
+    page.add(createModernBookCoverPanel("Detail Buku", 320, 480), BorderLayout.WEST);
+    page.add(createModernBookDetailCard(book, managementMode), BorderLayout.CENTER);
+
+    contentPanel.add(page);
+    refreshContent();
+}
+
+private JPanel createModernBookDetailCard(com.mycompany.perpustakaan.api.BookSummary book, boolean managementMode) {
+    JPanel card = new RoundedPanel(28, WHITE, CARD_BORDER, 1f);
+    card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+    card.setBorder(new EmptyBorder(28, 30, 28, 30));
+    card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 480));
+
+    JPanel top = new JPanel(new BorderLayout());
+    top.setOpaque(false);
+    top.setAlignmentX(Component.LEFT_ALIGNMENT);
+    top.setMaximumSize(new Dimension(Integer.MAX_VALUE, 90));
+
+    JPanel titleBox = new JPanel();
+    titleBox.setOpaque(false);
+    titleBox.setLayout(new BoxLayout(titleBox, BoxLayout.Y_AXIS));
+
+    JLabel title = new JLabel(safeOrDash(book.getJudul()));
+    title.setFont(new Font("Segoe UI", Font.BOLD, 26));
+    title.setForeground(TEXT_DARK);
+
+    JLabel author = new JLabel("Ditulis oleh " + safeOrDash(book.getPenulis()));
+    author.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+    author.setForeground(TEXT_GRAY);
+
+    titleBox.add(title);
+    titleBox.add(Box.createVerticalStrut(6));
+    titleBox.add(author);
+
+    JLabel statusBadge = createBookStatusBadge(book);
+
+    top.add(titleBox, BorderLayout.WEST);
+    top.add(statusBadge, BorderLayout.EAST);
+
+    card.add(top);
+    card.add(Box.createVerticalStrut(24));
+
+    JPanel infoGrid = new JPanel(new GridLayout(2, 3, 14, 14));
+    infoGrid.setOpaque(false);
+    infoGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
+    infoGrid.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
+
+    infoGrid.add(createBookDetailInfoItem("Kode Buku", safeOrDash(book.getKodeBuku())));
+    infoGrid.add(createBookDetailInfoItem("Kategori", safeOrDash(book.getKategori())));
+    infoGrid.add(createBookDetailInfoItem("Penerbit", safeOrDash(book.getPenerbit())));
+    infoGrid.add(createBookDetailInfoItem("Tahun Terbit", book.getTahunTerbit() == null ? "-" : String.valueOf(book.getTahunTerbit())));
+    infoGrid.add(createBookDetailInfoItem("Stok Tersedia", String.valueOf(book.getStokTersedia())));
+    infoGrid.add(createBookDetailInfoItem("Stok Total", String.valueOf(book.getStokTotal())));
+
+    card.add(infoGrid);
+    card.add(Box.createVerticalStrut(20));
+
+    JPanel synopsis = createModernSynopsisBlock(book);
+    card.add(synopsis);
+    card.add(Box.createVerticalGlue());
+
+    JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+    actions.setOpaque(false);
+    actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+    JButton back = createNeutralButton("Kembali");
+
+    back.addActionListener(e -> {
+        if (managementMode && isStaffOrAdmin()) {
+            showBookManagement();
+        } else {
+            showDashboard();
+        }
+    });
+
+    actions.add(back);
+
+    if (managementMode && isStaffOrAdmin()) {
+        JButton stock = createNeutralButton("Update Stok");
+        JButton edit = createActionButton("Edit Buku");
+
+        stock.addActionListener(e -> showStockPage(book.getIdBuku()));
+        edit.addActionListener(e -> showBookFormPage(book.getIdBuku()));
+
+        actions.add(stock);
+        actions.add(edit);
+    } else if (!isStaffOrAdmin() && book.getStokTersedia() > 0) {
+        JButton request = createActionButton("Request Pinjam");
+        request.addActionListener(e -> requestLoanFromDetail(book.getIdBuku()));
+        actions.add(request);
+    }
+
+    card.add(Box.createVerticalStrut(18));
+    card.add(actions);
+
+    return card;
+}
+
+private JPanel createBookDetailInfoItem(String labelText, String valueText) {
+    JPanel item = new RoundedPanel(20, SURFACE_ALT, CARD_BORDER, 1f);
+    item.setLayout(new BorderLayout(0, 6));
+    item.setBorder(new EmptyBorder(14, 16, 14, 16));
+
+    JLabel label = new JLabel(labelText);
+    label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+    label.setForeground(TEXT_GRAY);
+
+    JLabel value = new JLabel(safeOrDash(valueText));
+    value.setFont(new Font("Segoe UI", Font.BOLD, 15));
+    value.setForeground(TEXT_DARK);
+
+    item.add(label, BorderLayout.NORTH);
+    item.add(value, BorderLayout.CENTER);
+
+    return item;
+}
+
+private JLabel createBookStatusBadge(com.mycompany.perpustakaan.api.BookSummary book) {
+    boolean available = book.getStokTersedia() > 0;
+
+    JLabel badge = new JLabel(available ? "TERSEDIA" : "STOK HABIS");
+    badge.setFont(new Font("Segoe UI", Font.BOLD, 11));
+    badge.setForeground(WHITE);
+    badge.setOpaque(true);
+    badge.setBackground(available ? GREEN_STATUS : RED_STATUS);
+    badge.setBorder(new EmptyBorder(9, 14, 9, 14));
+
+    return badge;
+}
+
+private JPanel createModernSynopsisBlock(com.mycompany.perpustakaan.api.BookSummary book) {
+    JPanel block = new RoundedPanel(22, ACCENT_LIGHT, new Color(255, 226, 214), 1f);
+    block.setLayout(new BoxLayout(block, BoxLayout.Y_AXIS));
+    block.setBorder(new EmptyBorder(18, 20, 18, 20));
+    block.setAlignmentX(Component.LEFT_ALIGNMENT);
+    block.setMaximumSize(new Dimension(Integer.MAX_VALUE, 120));
+
+    JLabel label = new JLabel("Ringkasan Buku");
+    label.setFont(new Font("Segoe UI", Font.BOLD, 15));
+    label.setForeground(TEXT_DARK);
+    label.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+    String text = "Buku ini berada pada kategori "
+            + safeOrDash(book.getKategori())
+            + ", ditulis oleh "
+            + safeOrDash(book.getPenulis())
+            + ", dan memiliki stok tersedia "
+            + book.getStokTersedia()
+            + " dari total "
+            + book.getStokTotal()
+            + " buku.";
+
+    JLabel desc = new JLabel("<html><div style='width:760px;'>"
+            + escapeHtml(text)
+            + "</div></html>");
+    desc.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+    desc.setForeground(TEXT_GRAY);
+    desc.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+    block.add(label);
+    block.add(Box.createVerticalStrut(8));
+    block.add(desc);
+
+    return block;
+}
 
     private void showStockPage(int idBuku) {
         try {
@@ -3591,7 +4065,12 @@ private JPanel createModernBookCoverPanel(String labelText, int width, int heigh
             return null;
         }
         Object value = table.getValueAt(selected, 0);
-        return Integer.valueOf(String.valueOf(value));
+        try {
+            return Integer.valueOf(String.valueOf(value));
+        } catch (NumberFormatException exception) {
+            JOptionPane.showMessageDialog(this, "Data ini bukan baris yang bisa diproses.", "Info", JOptionPane.INFORMATION_MESSAGE);
+            return null;
+        }
     }
 
     private String chooseDirectory() {
