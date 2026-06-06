@@ -1801,6 +1801,36 @@ public class Dashboard extends JFrame {
         }
     }
 
+    private class DangerButton extends JButton {
+        DangerButton(String text) {
+            super(text);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2d = (Graphics2D) g.create();
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color fillColor;
+            if (getModel().isPressed()) {
+                fillColor = new Color(153, 27, 27);
+            } else if (getModel().isRollover()) {
+                fillColor = new Color(185, 28, 28);
+            } else {
+                fillColor = RED_STATUS;
+            }
+
+            g2d.setColor(new Color(0, 0, 0, 20));
+            g2d.fillRoundRect(7, 4, getWidth() - 14, getHeight() - 8, 14, 14);
+            g2d.setColor(fillColor);
+            g2d.fillRoundRect(5, 2, getWidth() - 10, getHeight() - 4, 14, 14);
+            g2d.dispose();
+
+            setForeground(WHITE);
+            super.paintComponent(g);
+        }
+    }
+
     private JButton createNotificationButton() {
         JButton button = new JButton();
         try {
@@ -1822,31 +1852,21 @@ public class Dashboard extends JFrame {
     }
 
     private JButton createLogoutButton() {
-        JButton button = new JButton("Logout");
+        JButton button = new DangerButton("Logout");
         button.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        button.setForeground(ACCENT);
-        button.setBackground(WHITE);
-        button.setHorizontalAlignment(SwingConstants.LEFT);
+        button.setForeground(WHITE);
+        button.setBackground(RED_STATUS);
+        button.setHorizontalAlignment(SwingConstants.CENTER);
         button.setFocusPainted(false);
         button.setBorderPainted(false);
         button.setContentAreaFilled(false);
-        button.setMaximumSize(new Dimension(180, 45));
-        button.setPreferredSize(new Dimension(180, 45));
+        button.setOpaque(false);
+        button.setMaximumSize(new Dimension(214, 48));
+        button.setPreferredSize(new Dimension(214, 48));
         button.setAlignmentX(Component.CENTER_ALIGNMENT);
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        button.setBorder(new EmptyBorder(10, 15, 10, 15));
+        button.setBorder(new EmptyBorder(10, 16, 10, 16));
         button.addActionListener(e -> performLogout());
-        button.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                button.setForeground(ACCENT_DARK);
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                button.setForeground(ACCENT);
-            }
-        });
         return button;
     }
 
