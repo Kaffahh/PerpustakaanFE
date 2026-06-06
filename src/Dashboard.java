@@ -66,6 +66,12 @@ public class Dashboard extends JFrame {
     private JLabel roleLabel;
     private String currentRole = "anggota";
 
+    // === BOOKSHELF FIELDS ===
+    private String currentKeyword = "";
+    private String currentCategory = "Semua kategori";
+    private JTextField searchField;
+    private JComboBox<String> categoryFilter;
+
     public Dashboard() {
         this(new com.mycompany.perpustakaan.api.LibraryApi());
     }
@@ -162,7 +168,7 @@ public class Dashboard extends JFrame {
                 addMenuButton("Loans & Returns", "/icon-loan.png", e -> showLoanManagement());
                 addMenuButton("Members", "/icon-member.svg", e -> showMemberManagement());
             } else {
-                addMenuButton("Bookshelf", "/icon-bookshelf.png", e -> openBookshelf());
+                addMenuButton("Bookshelf", "/icon-bookshelf.png", e -> showBookshelf());
                 addMenuButton("Pinjam Buku", "/icon-loan.png", e -> showRequestLoan());
                 addMenuButton("Pinjaman Aktif", "/Homework.svg", e -> showCurrentLoans());
                 addMenuButton("History", "/icon-history.png", e -> showUserHistory());
@@ -307,7 +313,7 @@ public class Dashboard extends JFrame {
             addUserSummaryCards();
             addQuickActions(new String[]{"Bookshelf", "Request Pinjam", "Pinjaman Aktif", "Tambah Kunjungan"},
                     new Runnable[]{
-                        this::openBookshelf,
+                        this::showBookshelf,
                         this::showRequestLoan,
                         this::showCurrentLoans,
                         this::showVisitForm
@@ -1774,17 +1780,285 @@ public class Dashboard extends JFrame {
         }
     }
 
-    private void openBookshelf() {
+    private void showBookshelf() {
+        resetContent();
+        addTitle("Bookshelf Perpustakaan");
+
+        // Search bar
+        contentPanel.add(createSearchBar());
+        contentPanel.add(Box.createVerticalStrut(15));
+
         try {
-            Class<?> bookshelfClass = Class.forName("Bookshelf");
-            JFrame bookshelf = (JFrame) bookshelfClass
-                    .getConstructor(com.mycompany.perpustakaan.api.LibraryApi.class)
-                    .newInstance(libraryApi);
-            bookshelf.setVisible(true);
-            dispose();
-        } catch (ReflectiveOperationException | ClassCastException e) {
-            showError("Gagal membuka bookshelf", e);
+            // MODE PENCARIAN
+            if (!currentKeyword.isBlank() || !"Semua kategori".equals(currentCategory)) {
+                contentPanel.add(createSearchResultSection());
+                refreshContent();
+                return;
+            }
+
+            // MODE DEFAULT: per kategori
+            List<String> categories = libraryApi.getBookCategories();
+            if (categories == null || categories.isEmpty()) {
+                categories = List.of("SCI-FI", "FANTASY", "ECONOMY", "LAW");
+            }
+
+            for (int i = 0; i < categories.size(); i++) {
+                contentPanel.add(createCategorySection(categories.get(i)));
+                if (i < categories.size() - 1) {
+                    contentPanel.add(Box.createVerticalStrut(15));
+                }
+            }
+
+        } catch (SQLException e) {
+            showError("Gagal memuat bookshelf", e);
+            String[] fallback = {"SCI-FI", "FANTASY", "ECONOMY", "LAW"};
+            for (int i = 0; i < fallback.length; i++) {
+                contentPanel.add(createCategorySection(fallback[i]));
+                if (i < fallback.length - 1) {
+                    contentPanel.add(Box.createVerticalStrut(15));
+                }
+            }
         }
+
+        refreshContent();
+    }
+
+    private JPanel createSearchBar() {
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        searchPanel.setOpaque(false);
+        searchPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        searchPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
+
+        String placeholder = "Cari judul atau penulis...";
+        String initialText = currentKeyword.isBlank() ? placeholder : currentKeyword;
+
+        // Search field dengan rounded background
+        searchField = new JTextField(initialText) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setColor(new Color(220, 220, 220)); // SEARCH_BG
+                g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+
+        searchField.setPreferredSize(new Dimension(400, 42));
+        searchField.setFont(new Font("Segoe UI", currentKeyword.isBlank() ? Font.ITALIC : Font.PLAIN, 14));
+        searchField.setForeground(currentKeyword.isBlank() ? TEXT_GRAY : TEXT_DARK);
+        searchField.setOpaque(false);
+        searchField.setBorder(new EmptyBorder(10, 40, 10, 20));
+
+        // Icon search di dalam field
+        JLabel searchIcon = new JLabel("🔍");
+        searchIcon.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        searchIcon.setForeground(TEXT_GRAY);
+        searchIcon.setBounds(12, 10, 24, 24);
+
+        JPanel searchWrapper = new JPanel(null);
+        searchWrapper.setOpaque(false);
+        searchWrapper.setPreferredSize(new Dimension(410, 48));
+        searchWrapper.add(searchIcon);
+        searchWrapper.add(searchField);
+        searchField.setBounds(0, 0, 400, 42);
+
+        searchField.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                if (searchField.getText().equals(placeholder)) {
+                    searchField.setText("");
+                    searchField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+                    searchField.setForeground(TEXT_DARK);
+                }
+            }
+
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                if (searchField.getText().isBlank()) {
+                    searchField.setText(placeholder);
+                    searchField.setFont(new Font("Segoe UI", Font.ITALIC, 14));
+                    searchField.setForeground(TEXT_GRAY);
+                }
+            }
+        });
+        searchField.addActionListener(e -> performSearch());
+
+        // Category dropdown
+        categoryFilter = new JComboBox<>(loadCategoryOptions());
+        categoryFilter.setPreferredSize(new Dimension(180, 42));
+        categoryFilter.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        categoryFilter.setSelectedItem(currentCategory);
+        categoryFilter.setBorder(BorderFactory.createLineBorder(new Color(210, 210, 210), 1, true));
+        categoryFilter.addActionListener(e -> {
+            Object selected = categoryFilter.getSelectedItem();
+            currentCategory = selected == null ? "Semua kategori" : selected.toString();
+            performSearch();
+        });
+
+        // Search button
+        JButton searchButton = new JButton("Cari") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setColor(new Color(0, 0, 0, 20));
+                g2d.fillRoundRect(2, 2, getWidth() - 2, getHeight() - 2, 10, 10);
+
+                if (getModel().isPressed()) {
+                    g2d.setColor(ACCENT.darker());
+                } else if (getModel().isRollover()) {
+                    g2d.setColor(ACCENT.brighter());
+                } else {
+                    g2d.setColor(ACCENT);
+                }
+                g2d.fillRoundRect(0, 0, getWidth() - 2, getHeight() - 2, 10, 10);
+
+                g2d.setColor(WHITE);
+                g2d.setFont(getFont());
+                java.awt.FontMetrics fm = g2d.getFontMetrics();
+                int textX = (getWidth() - fm.stringWidth(getText())) / 2;
+                int textY = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2d.drawString(getText(), textX, textY);
+                g2d.dispose();
+            }
+        };
+        searchButton.setPreferredSize(new Dimension(80, 42));
+        searchButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        searchButton.setForeground(WHITE);
+        searchButton.setFocusPainted(false);
+        searchButton.setBorderPainted(false);
+        searchButton.setContentAreaFilled(false);
+        searchButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        searchButton.addActionListener(e -> performSearch());
+
+        searchPanel.add(searchWrapper);
+        searchPanel.add(categoryFilter);
+        searchPanel.add(searchButton);
+        return searchPanel;
+    }
+
+    private void performSearch() {
+        String keyword = searchField.getText().trim();
+        currentKeyword = keyword.equals("Cari judul atau penulis...") ? "" : keyword;
+        Object selected = categoryFilter == null ? null : categoryFilter.getSelectedItem();
+        currentCategory = selected == null ? "Semua kategori" : selected.toString();
+        showBookshelf();
+    }
+
+    private String[] loadCategoryOptions() {
+        java.util.ArrayList<String> options = new java.util.ArrayList<>();
+        options.add("Semua kategori");
+        try {
+            for (String category : libraryApi.getBookCategories()) {
+                if (category != null && !category.isBlank() && !options.contains(category)) {
+                    options.add(category);
+                }
+            }
+        } catch (SQLException exception) {
+            logger.log(java.util.logging.Level.WARNING, "Gagal memuat kategori", exception);
+        }
+        return options.toArray(new String[0]);
+    }
+
+    private JPanel createSearchResultSection() {
+        JPanel section = new JPanel();
+        section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
+        section.setOpaque(false);
+        section.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // Title tanpa arrow
+        JLabel titleLabel = new JLabel("HASIL PENCARIAN");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        titleLabel.setForeground(ACCENT);
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        section.add(titleLabel);
+        section.add(Box.createVerticalStrut(15));
+
+        // Grid cards
+        JPanel grid = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 15));
+        grid.setOpaque(false);
+        grid.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        try {
+            String safeKeyword = currentKeyword.isBlank() ? null : currentKeyword;
+            String safeCategory = "Semua kategori".equals(currentCategory) ? null : currentCategory;
+
+            com.mycompany.perpustakaan.api.BookshelfPage page =
+                    libraryApi.getBookshelfPage(safeKeyword, safeCategory, 1, 20);
+
+            List<com.mycompany.perpustakaan.api.BookSummary> books = page.getBooks();
+
+            if (books.isEmpty()) {
+                JLabel empty = new JLabel("Tidak ada buku yang ditemukan.");
+                empty.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+                empty.setForeground(TEXT_GRAY);
+                grid.add(empty);
+            } else {
+                for (com.mycompany.perpustakaan.api.BookSummary book : books) {
+                    grid.add(new BookCard(book));
+                }
+            }
+        } catch (SQLException e) {
+            logger.log(java.util.logging.Level.WARNING, "Gagal memuat hasil pencarian", e);
+            JLabel error = new JLabel("Gagal memuat data. Periksa koneksi.");
+            error.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            error.setForeground(RED_STATUS);
+            grid.add(error);
+        }
+
+        section.add(grid);
+        return section;
+    }
+
+    private JPanel createCategorySection(String category) {
+        JPanel section = new JPanel();
+        section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
+        section.setOpaque(false);
+        section.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // Title dengan arrow
+        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        titlePanel.setOpaque(false);
+        titlePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel(category.toUpperCase());
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        titleLabel.setForeground(ACCENT);
+
+        JLabel arrow = new JLabel("→");
+        arrow.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        arrow.setForeground(ACCENT);
+
+        titlePanel.add(titleLabel);
+        titlePanel.add(arrow);
+        section.add(titlePanel);
+        section.add(Box.createVerticalStrut(15));
+
+        // Horizontal scroll cards
+        HorizontalScrollPanel scrollPanel = new HorizontalScrollPanel();
+
+        try {
+            com.mycompany.perpustakaan.api.BookshelfPage page =
+                    libraryApi.getBookshelfPage(null, category, 1, 8);
+
+            List<com.mycompany.perpustakaan.api.BookSummary> books = page.getBooks();
+
+            if (books.isEmpty()) {
+                scrollPanel.addCard(null);
+            } else {
+                for (com.mycompany.perpustakaan.api.BookSummary book : books) {
+                    scrollPanel.addCard(book);
+                }
+            }
+        } catch (SQLException e) {
+            logger.log(java.util.logging.Level.WARNING, "Gagal memuat kategori " + category, e);
+            scrollPanel.addCard(null);
+        }
+
+        section.add(scrollPanel);
+        return section;
     }
 
     private Integer selectedId(JTable table) {
