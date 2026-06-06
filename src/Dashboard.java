@@ -1,4 +1,5 @@
 import java.awt.BorderLayout;
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -12,6 +13,7 @@ import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -1309,9 +1311,59 @@ public class Dashboard extends JFrame {
         if (resource == null) {
             return null;
         }
+        if (resourcePath.toLowerCase().endsWith(".svg")) {
+            return createSvgFallbackIcon(resourcePath);
+        }
         ImageIcon source = new ImageIcon(resource);
+        if (source.getIconWidth() <= 0 || source.getIconHeight() <= 0) {
+            return createSvgFallbackIcon(resourcePath);
+        }
         Image scaled = source.getImage().getScaledInstance(22, 22, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
+    }
+
+    private ImageIcon createSvgFallbackIcon(String resourcePath) {
+        BufferedImage image = new BufferedImage(22, 22, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = image.createGraphics();
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(TEXT_DARK);
+
+        String name = resourcePath.toLowerCase();
+        if (name.contains("member") || name.contains("customer")) {
+            drawMemberIcon(g2d);
+        } else if (name.contains("book")) {
+            drawBookIcon(g2d);
+        } else if (name.contains("homework") || name.contains("control") || name.contains("time")) {
+            drawReportIcon(g2d);
+        } else {
+            g2d.fillRoundRect(4, 4, 14, 14, 3, 3);
+        }
+
+        g2d.dispose();
+        return new ImageIcon(image);
+    }
+
+    private void drawMemberIcon(Graphics2D g2d) {
+        g2d.drawOval(8, 4, 6, 6);
+        g2d.drawArc(5, 11, 12, 8, 0, 180);
+        g2d.drawOval(3, 7, 4, 4);
+        g2d.drawOval(15, 7, 4, 4);
+        g2d.drawArc(1, 13, 8, 6, 0, 160);
+        g2d.drawArc(13, 13, 8, 6, 20, 160);
+    }
+
+    private void drawBookIcon(Graphics2D g2d) {
+        g2d.drawRoundRect(4, 4, 6, 14, 2, 2);
+        g2d.drawRoundRect(11, 4, 7, 14, 2, 2);
+        g2d.drawLine(10, 5, 10, 18);
+    }
+
+    private void drawReportIcon(Graphics2D g2d) {
+        g2d.drawRoundRect(5, 3, 12, 16, 2, 2);
+        g2d.drawLine(8, 8, 14, 8);
+        g2d.drawLine(8, 12, 14, 12);
+        g2d.drawLine(8, 16, 12, 16);
     }
 
     private ImageIcon loadBookCoverPlaceholder() {
