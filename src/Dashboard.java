@@ -302,8 +302,10 @@ public class Dashboard extends JFrame {
         if (isAdmin()) {
             addTitle("Dashboard Admin");
             addAdminSummaryCards();
-            addQuickActions(new String[]{"Tambah Buku", "Inventory", "Loan Report", "Buku Populer"},
-                    new Runnable[]{this::showAddBookDialog, this::showInventoryReport, this::showLoanReport, this::showPopularBookReport});
+            addQuickActions(
+                    new String[]{"Admin Report", "Inventory", "Loan Report", "Buku Populer", "Tambah Buku", "Manajemen Buku", "Loans & Returns", "Members"},
+                    new Runnable[]{this::showAdminDashboard, this::showInventoryReport, this::showLoanReport, this::showPopularBookReport, this::showAddBookDialog, this::showBookManagement, this::showLoanManagement, this::showMemberManagement}
+            );
         } else if (isStaffOrAdmin()) {
             addTitle("Dashboard Staff");
             addQuickActions(new String[]{"Tambah Buku", "Manajemen Buku", "Loans & Returns", "Members"},
@@ -311,6 +313,8 @@ public class Dashboard extends JFrame {
         } else {
             addTitle("Dashboard Anggota");
             addUserSummaryCards();
+            contentPanel.add(createSearchBar());
+            contentPanel.add(Box.createVerticalStrut(18));
             addQuickActions(new String[]{"Bookshelf", "Request Pinjam", "Pinjaman Aktif", "Tambah Kunjungan"},
                     new Runnable[]{
                         this::showBookshelf,
@@ -318,12 +322,15 @@ public class Dashboard extends JFrame {
                         this::showCurrentLoans,
                         this::showVisitForm
                     });
+            addBookSections();
         }
-        addBookSections();
         refreshContent();
     }
 
     private void showAdminDashboard() {
+        if (!requireAdminView()) {
+            return;
+        }
         resetContent();
         addTitle("Dashboard Admin / Report");
         addAdminSummaryCards();
@@ -368,6 +375,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showInventoryReport() {
+        if (!requireAdminView()) {
+            return;
+        }
         resetContent();
         addTitle("Laporan Inventory");
         addQuickActions(new String[]{"Export PDF", "Export XLSX", "Tambah Buku"},
@@ -393,6 +403,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showLoanReport() {
+        if (!requireAdminView()) {
+            return;
+        }
         resetContent();
         addTitle("Laporan Peminjaman Berdasarkan Tanggal");
 
@@ -447,6 +460,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showPopularBookReport() {
+        if (!requireAdminView()) {
+            return;
+        }
         resetContent();
         addTitle("Laporan Buku Populer");
         try {
@@ -470,6 +486,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showBookManagement() {
+        if (!requireStaffOrAdminView()) {
+            return;
+        }
         resetContent();
         addTitle("Manajemen Buku");
         addQuickActions(new String[]{"Tambah Buku", "Refresh"}, new Runnable[]{this::showAddBookDialog, this::showBookManagement});
@@ -512,6 +531,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showLoanManagement() {
+        if (!requireStaffOrAdminView()) {
+            return;
+        }
         resetContent();
         addTitle("Loans & Returns");
         JPanel actions = createToolbarPanel();
@@ -565,6 +587,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showMemberManagement() {
+        if (!requireStaffOrAdminView()) {
+            return;
+        }
         resetContent();
         addTitle("Member Management");
         addQuickActions(new String[]{"Tambah Anggota", "Refresh"}, new Runnable[]{this::showAddMemberDialog, this::showMemberManagement});
@@ -603,6 +628,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showRequestLoan() {
+        if (!requireMemberView()) {
+            return;
+        }
         resetContent();
         addTitle("Request Pinjam Buku");
         try {
@@ -626,6 +654,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showCurrentLoans() {
+        if (!requireMemberView()) {
+            return;
+        }
         resetContent();
         addTitle("Pinjaman Aktif Saya");
         try {
@@ -641,6 +672,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showUserHistory() {
+        if (!requireMemberView()) {
+            return;
+        }
         resetContent();
         addTitle("History Peminjaman Saya");
         try {
@@ -657,6 +691,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showVisitForm() {
+        if (!requireMemberView()) {
+            return;
+        }
         JTextField jenis = createField("mahasiswa");
         JTextField asal = createField("");
         JTextField keperluan = createField("Membaca buku");
@@ -1781,6 +1818,9 @@ public class Dashboard extends JFrame {
     }
 
     private void showBookshelf() {
+        if (!requireMemberView()) {
+            return;
+        }
         resetContent();
         addTitle("Bookshelf Perpustakaan");
 
@@ -2098,6 +2138,39 @@ public class Dashboard extends JFrame {
 
     private boolean isStaffOrAdmin() {
         return isAdmin() || "staff".equalsIgnoreCase(currentRole);
+    }
+
+    private boolean isMember() {
+        return !isStaffOrAdmin();
+    }
+
+    private boolean requireAdminView() {
+        if (isAdmin()) {
+            return true;
+        }
+        showAccessDenied("Fitur ini khusus admin.");
+        return false;
+    }
+
+    private boolean requireStaffOrAdminView() {
+        if (isStaffOrAdmin()) {
+            return true;
+        }
+        showAccessDenied("Fitur ini khusus staff atau admin.");
+        return false;
+    }
+
+    private boolean requireMemberView() {
+        if (isMember()) {
+            return true;
+        }
+        showAccessDenied("Fitur ini khusus anggota.");
+        return false;
+    }
+
+    private void showAccessDenied(String message) {
+        JOptionPane.showMessageDialog(this, message, "Akses Ditolak", JOptionPane.WARNING_MESSAGE);
+        showDashboard();
     }
 
     private String roleTitle() {
