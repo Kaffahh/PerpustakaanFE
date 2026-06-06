@@ -333,37 +333,25 @@ public class Dashboard extends JFrame {
     private void showDashboard() {
         contentPanel.removeAll();
 
-        // Ambil data dari API
         try {
-            com.mycompany.perpustakaan.api.DashboardSummary summary = libraryApi.getDashboardSummary(5);
-            List<com.mycompany.perpustakaan.api.BookSummary> books = summary.getLatestBooks();
+            com.mycompany.perpustakaan.api.DashboardSummary summary = libraryApi.getDashboardSummary(10);
+            List<com.mycompany.perpustakaan.api.BookSummary> popularBooks = summary.getPopularBooks();
+            List<com.mycompany.perpustakaan.api.BookSummary> latestBooks = summary.getLatestBooks();
 
-            // Section: TRENDING (mock data - pake latest books)
-            contentPanel.add(createSection("TRENDING", books, true));
+            contentPanel.add(createSection("BUKU TERPOPULER", popularBooks));
             contentPanel.add(Box.createVerticalStrut(25));
-
-            // Section: AWARDS (mock - subset)
-            contentPanel.add(createSection("AWARDS", books, false));
-            contentPanel.add(Box.createVerticalStrut(25));
-
-            // Section: NEW
-            contentPanel.add(createSection("NEW", books, true));
-            contentPanel.add(Box.createVerticalStrut(25));
-
-            // Section: UPCOMING
-            contentPanel.add(createSection("UPCOMING", books, false));
+            contentPanel.add(createSection("BUKU TERBARU", latestBooks));
 
         } catch (SQLException e) {
             showError("Gagal memuat dashboard", e);
-            // Fallback: kosong
-            contentPanel.add(createSection("TRENDING", java.util.Collections.emptyList(), true));
+            contentPanel.add(createSection("BUKU TERPOPULER", java.util.Collections.emptyList()));
         }
 
         contentPanel.revalidate();
         contentPanel.repaint();
     }
 
-    private JPanel createSection(String title, List<com.mycompany.perpustakaan.api.BookSummary> books, boolean alternateStatus) {
+    private JPanel createSection(String title, List<com.mycompany.perpustakaan.api.BookSummary> books) {
         JPanel section = new JPanel();
         section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
         section.setOpaque(false);
@@ -391,12 +379,12 @@ public class Dashboard extends JFrame {
         // Horizontal scroll cards
         HorizontalScrollPanel scrollPanel = new HorizontalScrollPanel();
         
-        // Mock cards - dalam real app, iterate books
-        for (int i = 0; i < 8; i++) {
-            boolean available = alternateStatus ? (i % 2 == 0) : (i % 2 != 0);
-            String bookTitle = i < books.size() ? books.get(i).getJudul() : "TITLE " + (i + 1);
-            String author = i < books.size() ? books.get(i).getPenulis() : "AUTHOR";
-            scrollPanel.addCard(bookTitle, author, available);
+        if (books == null || books.isEmpty()) {
+            scrollPanel.addCard("Belum ada buku", "Data belum tersedia", false);
+        } else {
+            for (com.mycompany.perpustakaan.api.BookSummary book : books) {
+                scrollPanel.addCard(book.getJudul(), book.getPenulis(), book.getStokTersedia() > 0);
+            }
         }
 
         section.add(scrollPanel);
