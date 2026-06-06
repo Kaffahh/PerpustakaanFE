@@ -6,6 +6,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Image;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.event.FocusEvent;
@@ -46,6 +47,7 @@ public class LoginForm extends JFrame {
     private static final Dimension CARD_SIZE   = new Dimension(380, 520);
     private static final Dimension FIELD_SIZE  = new Dimension(280, 40);
     private static final Dimension BUTTON_SIZE = new Dimension(120, 40);
+    private static final Dimension LOGO_SIZE   = new Dimension(150, 120);
 
     public LoginForm() {
         this(new com.mycompany.perpustakaan.api.LibraryApi());
@@ -113,13 +115,14 @@ public class LoginForm extends JFrame {
         gbc.insets = new Insets(0, 0, 10, 0);
         JLabel logo = new JLabel();
         try {
-            ImageIcon icon = new ImageIcon(getClass().getResource("/assets/branding/library-logo.png"));
+            ImageIcon icon = loadScaledIcon("/assets/branding/library-logo.png", LOGO_SIZE.width, LOGO_SIZE.height);
             logo.setIcon(icon);
         } catch (Exception e) {
             logo.setText("📚 LIBRARY HUB");
             logo.setFont(new Font("Segoe UI", Font.BOLD, 16));
             logo.setForeground(new Color(139, 90, 43));
         }
+        logo.setPreferredSize(LOGO_SIZE);
         logo.setHorizontalAlignment(SwingConstants.CENTER);
         card.add(logo, gbc);
 
@@ -207,6 +210,26 @@ public class LoginForm extends JFrame {
         label.setFont(new Font("Segoe UI", Font.BOLD, 13));
         label.setForeground(TEXT_COLOR);
         return label;
+    }
+
+    private ImageIcon loadScaledIcon(String resourcePath, int maxWidth, int maxHeight) {
+        java.net.URL resource = getClass().getResource(resourcePath);
+        if (resource == null) {
+            return null;
+        }
+
+        ImageIcon source = new ImageIcon(resource);
+        int sourceWidth = source.getIconWidth();
+        int sourceHeight = source.getIconHeight();
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+            return source;
+        }
+
+        double scale = Math.min((double) maxWidth / sourceWidth, (double) maxHeight / sourceHeight);
+        int targetWidth = Math.max(1, (int) Math.round(sourceWidth * scale));
+        int targetHeight = Math.max(1, (int) Math.round(sourceHeight * scale));
+        Image scaled = source.getImage().getScaledInstance(targetWidth, targetHeight, Image.SCALE_SMOOTH);
+        return new ImageIcon(scaled);
     }
 
     // === STYLED TEXTFIELD (Rounded + Shadow + Placeholder) ===

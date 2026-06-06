@@ -43,7 +43,8 @@ import javax.swing.table.DefaultTableModel;
 
 public class Dashboard extends JFrame {
 
-    private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(Dashboard.class.getName());
+    private static final java.util.logging.Logger logger = java.util.logging.Logger
+            .getLogger(Dashboard.class.getName());
     private final com.mycompany.perpustakaan.api.LibraryApi libraryApi;
 
     private static final Color BG_APP = new Color(247, 248, 250);
@@ -62,6 +63,7 @@ public class Dashboard extends JFrame {
     private static final Dimension SIDEBAR_SIZE = new Dimension(260, 720);
     private static final Dimension HEADER_SIZE = new Dimension(1060, 92);
     private static final Dimension CARD_SIZE = new Dimension(160, 240);
+    private static final Dimension SIDEBAR_LOGO_SIZE = new Dimension(150, 120);
 
     private SidebarButton activeButton;
     private JPanel contentPanel;
@@ -138,12 +140,13 @@ public class Dashboard extends JFrame {
 
             JLabel logo = new JLabel();
             try {
-                logo.setIcon(new ImageIcon(getClass().getResource("/assets/branding/library-logo.png")));
+                logo.setIcon(loadBrandLogoIcon(SIDEBAR_LOGO_SIZE.width, SIDEBAR_LOGO_SIZE.height));
             } catch (Exception e) {
                 logo.setText("LIBRARY HUB");
                 logo.setFont(new Font("Segoe UI", Font.BOLD, 14));
                 logo.setForeground(new Color(139, 90, 43));
             }
+            logo.setPreferredSize(SIDEBAR_LOGO_SIZE);
             logo.setAlignmentX(Component.CENTER_ALIGNMENT);
             logo.setBorder(new EmptyBorder(20, 0, 18, 0));
             add(logo);
@@ -260,8 +263,7 @@ public class Dashboard extends JFrame {
             setLayout(new BorderLayout());
             setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_COLOR),
-                    new EmptyBorder(15, 25, 15, 25)
-            ));
+                    new EmptyBorder(15, 25, 15, 25)));
 
             JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
             left.setOpaque(false);
@@ -307,24 +309,27 @@ public class Dashboard extends JFrame {
             addTitle("Dashboard Admin");
             addAdminSummaryCards();
             addQuickActions(
-                    new String[]{"Admin Report", "Inventory", "Loan Report", "Buku Populer", "Tambah Buku", "Manajemen Buku", "Loans & Returns", "Members"},
-                    new Runnable[]{this::showAdminDashboard, this::showInventoryReport, this::showLoanReport, this::showPopularBookReport, this::showAddBookDialog, this::showBookManagement, this::showLoanManagement, this::showMemberManagement}
-            );
+                    new String[] { "Admin Report", "Inventory", "Loan Report", "Buku Populer", "Tambah Buku",
+                            "Manajemen Buku", "Loans & Returns", "Members" },
+                    new Runnable[] { this::showAdminDashboard, this::showInventoryReport, this::showLoanReport,
+                            this::showPopularBookReport, this::showAddBookDialog, this::showBookManagement,
+                            this::showLoanManagement, this::showMemberManagement });
         } else if (isStaffOrAdmin()) {
             addTitle("Dashboard Staff");
-            addQuickActions(new String[]{"Tambah Buku", "Manajemen Buku", "Loans & Returns", "Members"},
-                    new Runnable[]{this::showAddBookDialog, this::showBookManagement, this::showLoanManagement, this::showMemberManagement});
+            addQuickActions(new String[] { "Tambah Buku", "Manajemen Buku", "Loans & Returns", "Members" },
+                    new Runnable[] { this::showAddBookDialog, this::showBookManagement, this::showLoanManagement,
+                            this::showMemberManagement });
         } else {
             addTitle("Dashboard Anggota");
             addUserSummaryCards();
             contentPanel.add(createSearchBar());
             contentPanel.add(Box.createVerticalStrut(18));
-            addQuickActions(new String[]{"Bookshelf", "Request Pinjam", "Pinjaman Aktif", "Tambah Kunjungan"},
-                    new Runnable[]{
-                        this::showBookshelf,
-                        this::showRequestLoan,
-                        this::showCurrentLoans,
-                        this::showVisitForm
+            addQuickActions(new String[] { "Bookshelf", "Request Pinjam", "Pinjaman Aktif", "Tambah Kunjungan" },
+                    new Runnable[] {
+                            this::showBookshelf,
+                            this::showRequestLoan,
+                            this::showCurrentLoans,
+                            this::showVisitForm
                     });
             addBookSections();
         }
@@ -338,12 +343,13 @@ public class Dashboard extends JFrame {
         resetContent();
         addTitle("Dashboard Admin / Report");
         addAdminSummaryCards();
-        addQuickActions(new String[]{"Export Inventory PDF", "Export Inventory XLSX", "Export Loan PDF", "Export Loan XLSX"},
-                new Runnable[]{
-                    () -> exportInventory("pdf"),
-                    () -> exportInventory("xlsx"),
-                    () -> exportLoan("pdf"),
-                    () -> exportLoan("xlsx")
+        addQuickActions(
+                new String[] { "Export Inventory PDF", "Export Inventory XLSX", "Export Loan PDF", "Export Loan XLSX" },
+                new Runnable[] {
+                        () -> exportInventory("pdf"),
+                        () -> exportInventory("xlsx"),
+                        () -> exportLoan("pdf"),
+                        () -> exportLoan("xlsx")
                 });
         refreshContent();
     }
@@ -384,19 +390,21 @@ public class Dashboard extends JFrame {
         }
         resetContent();
         addTitle("Laporan Inventory");
-        addQuickActions(new String[]{"Export PDF", "Export XLSX", "Tambah Buku"},
-                new Runnable[]{() -> exportInventory("pdf"), () -> exportInventory("xlsx"), this::showAddBookDialog});
+        addQuickActions(new String[] { "Export PDF", "Export XLSX", "Tambah Buku" },
+                new Runnable[] { () -> exportInventory("pdf"), () -> exportInventory("xlsx"),
+                        this::showAddBookDialog });
         try {
-            DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Kode", "Judul", "Penulis", "Kategori", "Stok", "Status"}, 0);
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Stok", "Status" }, 0);
             for (com.mycompany.perpustakaan.api.InventoryReportRow row : libraryApi.getInventoryReport()) {
-                model.addRow(new Object[]{
-                    row.getIdBuku(),
-                    row.getKodeBuku(),
-                    row.getJudul(),
-                    row.getPenulis(),
-                    row.getKategori(),
-                    row.getStokTersedia() + "/" + row.getStokTotal(),
-                    row.getStatusKetersediaan()
+                model.addRow(new Object[] {
+                        row.getIdBuku(),
+                        row.getKodeBuku(),
+                        row.getJudul(),
+                        row.getPenulis(),
+                        row.getKategori(),
+                        row.getStokTersedia() + "/" + row.getStokTotal(),
+                        row.getStatusKetersediaan()
                 });
             }
             contentPanel.add(createTablePanel(model, 560));
@@ -438,17 +446,19 @@ public class Dashboard extends JFrame {
             try {
                 LocalDate startDate = parseDate(start.getText());
                 LocalDate endDate = parseDate(end.getText());
-                DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "User", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda"}, 0);
+                DefaultTableModel model = new DefaultTableModel(
+                        new Object[] { "ID", "User", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda" },
+                        0);
                 for (com.mycompany.perpustakaan.api.LoanReportRow row : libraryApi.getLoanReport(startDate, endDate)) {
-                    model.addRow(new Object[]{
-                        row.getIdPeminjaman(),
-                        row.getNamaUser(),
-                        row.getJudulBuku(),
-                        row.getTanggalPinjam(),
-                        row.getTanggalJatuhTempo(),
-                        row.getTanggalKembali(),
-                        row.getStatus(),
-                        formatMoney(row.getDenda())
+                    model.addRow(new Object[] {
+                            row.getIdPeminjaman(),
+                            row.getNamaUser(),
+                            row.getJudulBuku(),
+                            row.getTanggalPinjam(),
+                            row.getTanggalJatuhTempo(),
+                            row.getTanggalKembali(),
+                            row.getStatus(),
+                            formatMoney(row.getDenda())
                     });
                 }
                 tableHolder.add(createTablePanel(model, 540));
@@ -470,16 +480,17 @@ public class Dashboard extends JFrame {
         resetContent();
         addTitle("Laporan Buku Populer");
         try {
-            DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Kode", "Judul", "Penulis", "Kategori", "Dipinjam", "Stok"}, 0);
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Dipinjam", "Stok" }, 0);
             for (com.mycompany.perpustakaan.api.PopularBookReportRow row : libraryApi.getPopularBookReport(25)) {
-                model.addRow(new Object[]{
-                    row.getIdBuku(),
-                    row.getKodeBuku(),
-                    row.getJudul(),
-                    row.getPenulis(),
-                    row.getKategori(),
-                    row.getTotalDipinjam(),
-                    row.getStokTersedia() + "/" + row.getStokTotal()
+                model.addRow(new Object[] {
+                        row.getIdBuku(),
+                        row.getKodeBuku(),
+                        row.getJudul(),
+                        row.getPenulis(),
+                        row.getKategori(),
+                        row.getTotalDipinjam(),
+                        row.getStokTersedia() + "/" + row.getStokTotal()
                 });
             }
             contentPanel.add(createTablePanel(model, 560));
@@ -495,19 +506,21 @@ public class Dashboard extends JFrame {
         }
         resetContent();
         addTitle("Manajemen Buku");
-        addQuickActions(new String[]{"Tambah Buku", "Refresh"}, new Runnable[]{this::showAddBookDialog, this::showBookManagement});
+        addQuickActions(new String[] { "Tambah Buku", "Refresh" },
+                new Runnable[] { this::showAddBookDialog, this::showBookManagement });
         try {
             com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage("", "", 1, 50);
-            DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Kode", "Judul", "Penulis", "Kategori", "Stok", "Status"}, 0);
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Stok", "Status" }, 0);
             for (com.mycompany.perpustakaan.api.BookSummary book : page.getBooks()) {
-                model.addRow(new Object[]{
-                    book.getIdBuku(),
-                    book.getKodeBuku(),
-                    book.getJudul(),
-                    book.getPenulis(),
-                    book.getKategori(),
-                    book.getStokTersedia() + "/" + book.getStokTotal(),
-                    book.getStatusKetersediaan()
+                model.addRow(new Object[] {
+                        book.getIdBuku(),
+                        book.getKodeBuku(),
+                        book.getJudul(),
+                        book.getPenulis(),
+                        book.getKategori(),
+                        book.getStokTersedia() + "/" + book.getStokTotal(),
+                        book.getStatusKetersediaan()
                 });
             }
             JTable table = createTable(model);
@@ -542,7 +555,8 @@ public class Dashboard extends JFrame {
         addTitle("Loans & Returns");
         JPanel actions = createToolbarPanel();
         JButton create = createActionButton("Buat Peminjaman");
-        JComboBox<String> status = new JComboBox<>(new String[]{"semua", "aktif", "dipinjam", "terlambat", "dikembalikan"});
+        JComboBox<String> status = new JComboBox<>(
+                new String[] { "semua", "aktif", "dipinjam", "terlambat", "dikembalikan" });
         JButton load = createActionButton("Tampilkan");
         actions.add(create);
         actions.add(new JLabel("Status"));
@@ -557,17 +571,19 @@ public class Dashboard extends JFrame {
         Runnable render = () -> {
             tableHolder.removeAll();
             try {
-                com.mycompany.perpustakaan.api.LoanManagementPage page = libraryApi.getLoansForManagement((String) status.getSelectedItem(), 1, 50);
-                DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda"}, 0);
+                com.mycompany.perpustakaan.api.LoanManagementPage page = libraryApi
+                        .getLoansForManagement((String) status.getSelectedItem(), 1, 50);
+                DefaultTableModel model = new DefaultTableModel(
+                        new Object[] { "ID", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda" }, 0);
                 for (com.mycompany.perpustakaan.api.LoanSummary loan : page.getLoans()) {
-                    model.addRow(new Object[]{
-                        loan.getIdPeminjaman(),
-                        loan.getJudulBuku(),
-                        loan.getTanggalPinjam(),
-                        loan.getTanggalJatuhTempo(),
-                        loan.getTanggalKembali(),
-                        loan.getStatus(),
-                        formatMoney(loan.getDendaBerjalan())
+                    model.addRow(new Object[] {
+                            loan.getIdPeminjaman(),
+                            loan.getJudulBuku(),
+                            loan.getTanggalPinjam(),
+                            loan.getTanggalJatuhTempo(),
+                            loan.getTanggalKembali(),
+                            loan.getStatus(),
+                            formatMoney(loan.getDendaBerjalan())
                     });
                 }
                 JTable table = createTable(model);
@@ -596,17 +612,19 @@ public class Dashboard extends JFrame {
         }
         resetContent();
         addTitle("Member Management");
-        addQuickActions(new String[]{"Tambah Anggota", "Refresh"}, new Runnable[]{this::showAddMemberDialog, this::showMemberManagement});
+        addQuickActions(new String[] { "Tambah Anggota", "Refresh" },
+                new Runnable[] { this::showAddMemberDialog, this::showMemberManagement });
         try {
             com.mycompany.perpustakaan.api.MemberPage page = libraryApi.searchMembers("", "semua", 1, 50);
-            DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Nama", "Username", "Email", "Status"}, 0);
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[] { "ID", "Nama", "Username", "Email", "Status" }, 0);
             for (com.mycompany.perpustakaan.api.MemberSummary member : page.getMembers()) {
-                model.addRow(new Object[]{
-                    member.getIdUser(),
-                    member.getNama(),
-                    member.getUsername(),
-                    member.getEmail(),
-                    member.getStatusAkun()
+                model.addRow(new Object[] {
+                        member.getIdUser(),
+                        member.getNama(),
+                        member.getUsername(),
+                        member.getEmail(),
+                        member.getStatusAkun()
                 });
             }
             JTable table = createTable(model);
@@ -637,12 +655,12 @@ public class Dashboard extends JFrame {
         }
         resetContent();
         addTitle("Pending Loan Requests");
-        addQuickActions(new String[]{"Refresh"}, new Runnable[]{this::showPendingLoanRequests});
+        addQuickActions(new String[] { "Refresh" }, new Runnable[] { this::showPendingLoanRequests });
         try {
             List<com.mycompany.perpustakaan.api.LoanSummary> pendingLoans = libraryApi.getPendingLoanRequests();
             DefaultTableModel model = new DefaultTableModel(
-                new Object[]{"ID", "Peminjam", "Username", "Buku", "Tanggal Request", "Jatuh Tempo", "Status"}, 0
-            );
+                    new Object[] { "ID", "Peminjam", "Username", "Buku", "Tanggal Request", "Jatuh Tempo", "Status" },
+                    0);
             for (com.mycompany.perpustakaan.api.LoanSummary loan : pendingLoans) {
                 String namaPeminjam = loan.getNamaUser();
                 if (namaPeminjam == null || namaPeminjam.isBlank()) {
@@ -652,14 +670,14 @@ public class Dashboard extends JFrame {
                 if (username == null || username.isBlank()) {
                     username = "-";
                 }
-                model.addRow(new Object[]{
-                    loan.getIdPeminjaman(),
-                    namaPeminjam,
-                    username,
-                    loan.getJudulBuku(),
-                    loan.getTanggalPinjam(),
-                    loan.getTanggalJatuhTempo(),
-                    loan.getStatus()
+                model.addRow(new Object[] {
+                        loan.getIdPeminjaman(),
+                        namaPeminjam,
+                        username,
+                        loan.getJudulBuku(),
+                        loan.getTanggalPinjam(),
+                        loan.getTanggalJatuhTempo(),
+                        loan.getStatus()
                 });
             }
             JTable table = createTable(model);
@@ -687,7 +705,8 @@ public class Dashboard extends JFrame {
         if (id == null) {
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this, "Setujui peminjaman ID " + id + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        int confirm = JOptionPane.showConfirmDialog(this, "Setujui peminjaman ID " + id + "?", "Konfirmasi",
+                JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
             try {
                 com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.approveLoanRequest(id);
@@ -704,7 +723,8 @@ public class Dashboard extends JFrame {
         if (id == null) {
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this, "Tolak peminjaman ID " + id + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        int confirm = JOptionPane.showConfirmDialog(this, "Tolak peminjaman ID " + id + "?", "Konfirmasi",
+                JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
             try {
                 com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.rejectLoanRequest(id);
@@ -724,9 +744,11 @@ public class Dashboard extends JFrame {
         addTitle("Request Pinjam Buku");
         try {
             com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage("", "", 1, 50);
-            DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Kode", "Judul", "Penulis", "Kategori", "Stok"}, 0);
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Stok" }, 0);
             for (com.mycompany.perpustakaan.api.BookSummary book : page.getBooks()) {
-                model.addRow(new Object[]{book.getIdBuku(), book.getKodeBuku(), book.getJudul(), book.getPenulis(), book.getKategori(), book.getStokTersedia()});
+                model.addRow(new Object[] { book.getIdBuku(), book.getKodeBuku(), book.getJudul(), book.getPenulis(),
+                        book.getKategori(), book.getStokTersedia() });
             }
             JTable table = createTable(model);
             contentPanel.add(wrapTable(table, 520));
@@ -749,9 +771,11 @@ public class Dashboard extends JFrame {
         resetContent();
         addTitle("Pinjaman Aktif Saya");
         try {
-            DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Buku", "Pinjam", "Jatuh Tempo", "Status", "Denda"}, 0);
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[] { "ID", "Buku", "Pinjam", "Jatuh Tempo", "Status", "Denda" }, 0);
             for (com.mycompany.perpustakaan.api.LoanSummary loan : libraryApi.getCurrentLoans()) {
-                model.addRow(new Object[]{loan.getIdPeminjaman(), loan.getJudulBuku(), loan.getTanggalPinjam(), loan.getTanggalJatuhTempo(), loan.getStatus(), formatMoney(loan.getDendaBerjalan())});
+                model.addRow(new Object[] { loan.getIdPeminjaman(), loan.getJudulBuku(), loan.getTanggalPinjam(),
+                        loan.getTanggalJatuhTempo(), loan.getStatus(), formatMoney(loan.getDendaBerjalan()) });
             }
             contentPanel.add(createTablePanel(model, 520));
         } catch (SQLException e) {
@@ -768,9 +792,12 @@ public class Dashboard extends JFrame {
         addTitle("History Peminjaman Saya");
         try {
             com.mycompany.perpustakaan.api.HistoryPage page = libraryApi.getLoanHistory("semua", 1, 50);
-            DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda"}, 0);
+            DefaultTableModel model = new DefaultTableModel(
+                    new Object[] { "ID", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda" }, 0);
             for (com.mycompany.perpustakaan.api.LoanSummary loan : page.getLoans()) {
-                model.addRow(new Object[]{loan.getIdPeminjaman(), loan.getJudulBuku(), loan.getTanggalPinjam(), loan.getTanggalJatuhTempo(), loan.getTanggalKembali(), loan.getStatus(), formatMoney(loan.getDendaBerjalan())});
+                model.addRow(new Object[] { loan.getIdPeminjaman(), loan.getJudulBuku(), loan.getTanggalPinjam(),
+                        loan.getTanggalJatuhTempo(), loan.getTanggalKembali(), loan.getStatus(),
+                        formatMoney(loan.getDendaBerjalan()) });
             }
             contentPanel.add(createTablePanel(model, 520));
         } catch (SQLException e) {
@@ -786,11 +813,14 @@ public class Dashboard extends JFrame {
         JTextField jenis = createField("mahasiswa");
         JTextField asal = createField("");
         JTextField keperluan = createField("Membaca buku");
-        JPanel panel = formPanel(new String[]{"Jenis pengunjung", "Asal instansi", "Keperluan"}, new JTextField[]{jenis, asal, keperluan});
-        int result = JOptionPane.showConfirmDialog(this, panel, "Tambah Kunjungan", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        JPanel panel = formPanel(new String[] { "Jenis pengunjung", "Asal instansi", "Keperluan" },
+                new JTextField[] { jenis, asal, keperluan });
+        int result = JOptionPane.showConfirmDialog(this, panel, "Tambah Kunjungan", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
         if (result == JOptionPane.OK_OPTION) {
             try {
-                com.mycompany.perpustakaan.api.VisitResponse response = libraryApi.addRegisteredUserVisit(jenis.getText(), asal.getText(), keperluan.getText());
+                com.mycompany.perpustakaan.api.VisitResponse response = libraryApi
+                        .addRegisteredUserVisit(jenis.getText(), asal.getText(), keperluan.getText());
                 showResponse(response.isSuccess(), response.getMessage());
             } catch (SQLException e) {
                 showError("Gagal menambah kunjungan", e);
@@ -844,13 +874,12 @@ public class Dashboard extends JFrame {
         formCard.setMaximumSize(new Dimension(620, 520));
         formCard.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER_COLOR),
-                new EmptyBorder(24, 28, 24, 28)
-        ));
+                new EmptyBorder(24, 28, 24, 28)));
 
         formCard.add(createBookFormFields(
-                new String[]{"Kode Buku", "Judul", "Penulis", "Penerbit", "Kategori", "Tahun Terbit", "Stok Tersedia", "Stok Total"},
-                new JTextField[]{kode, judul, penulis, penerbit, kategori, tahun, stokTersedia, stokTotal}
-        ));
+                new String[] { "Kode Buku", "Judul", "Penulis", "Penerbit", "Kategori", "Tahun Terbit", "Stok Tersedia",
+                        "Stok Total" },
+                new JTextField[] { kode, judul, penulis, penerbit, kategori, tahun, stokTersedia, stokTotal }));
         formCard.add(Box.createVerticalStrut(18));
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
@@ -864,8 +893,10 @@ public class Dashboard extends JFrame {
                 Integer tahunValue = tahun.getText().trim().isEmpty() ? null : Integer.valueOf(tahun.getText().trim());
                 com.mycompany.perpustakaan.api.BookRequest request = new com.mycompany.perpustakaan.api.BookRequest(
                         kode.getText(), judul.getText(), penulis.getText(), penerbit.getText(),
-                        kategori.getText(), tahunValue, Integer.parseInt(stokTersedia.getText().trim()), Integer.parseInt(stokTotal.getText().trim()));
-                com.mycompany.perpustakaan.api.BookResponse response = idBuku == null ? libraryApi.addBook(request) : libraryApi.updateBook(idBuku, request);
+                        kategori.getText(), tahunValue, Integer.parseInt(stokTersedia.getText().trim()),
+                        Integer.parseInt(stokTotal.getText().trim()));
+                com.mycompany.perpustakaan.api.BookResponse response = idBuku == null ? libraryApi.addBook(request)
+                        : libraryApi.updateBook(idBuku, request);
                 showResponse(response.isSuccess(), response.getMessage());
                 if (response.isSuccess()) {
                     showBookManagement();
@@ -921,7 +952,8 @@ public class Dashboard extends JFrame {
         if (id == null) {
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this, "Hapus buku ID " + id + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        int confirm = JOptionPane.showConfirmDialog(this, "Hapus buku ID " + id + "?", "Konfirmasi",
+                JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
             try {
                 com.mycompany.perpustakaan.api.BookResponse response = libraryApi.deleteBook(id);
@@ -960,7 +992,8 @@ public class Dashboard extends JFrame {
         detail.add(createDetailRow("Kode", safe(book.getKodeBuku())));
         detail.add(createDetailRow("Author", safe(book.getPenulis())));
         detail.add(createDetailRow("Penerbit", safeOrDash(book.getPenerbit())));
-        detail.add(createDetailRow("Published", book.getTahunTerbit() == null ? "-" : String.valueOf(book.getTahunTerbit())));
+        detail.add(createDetailRow("Published",
+                book.getTahunTerbit() == null ? "-" : String.valueOf(book.getTahunTerbit())));
         detail.add(createDetailRow("Kategori", safeOrDash(book.getKategori())));
         detail.add(createDetailRow("Status", safeOrDash(book.getStatusKetersediaan())));
         detail.add(Box.createVerticalStrut(8));
@@ -1055,8 +1088,7 @@ public class Dashboard extends JFrame {
                     com.mycompany.perpustakaan.api.BookResponse response = libraryApi.updateBookStock(
                             idBuku,
                             Integer.parseInt(tersedia.getText().trim()),
-                            Integer.parseInt(total.getText().trim())
-                    );
+                            Integer.parseInt(total.getText().trim()));
                     showResponse(response.isSuccess(), response.getMessage());
                     if (response.isSuccess()) {
                         showBookManagement();
@@ -1081,8 +1113,10 @@ public class Dashboard extends JFrame {
         JTextField idUser = createField("");
         JTextField idBuku = createField("");
         JTextField hari = createField("7");
-        JPanel panel = formPanel(new String[]{"ID User", "ID Buku", "Lama pinjam (hari)"}, new JTextField[]{idUser, idBuku, hari});
-        int result = JOptionPane.showConfirmDialog(this, panel, "Buat Peminjaman Untuk User", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        JPanel panel = formPanel(new String[] { "ID User", "ID Buku", "Lama pinjam (hari)" },
+                new JTextField[] { idUser, idBuku, hari });
+        int result = JOptionPane.showConfirmDialog(this, panel, "Buat Peminjaman Untuk User",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (result == JOptionPane.OK_OPTION) {
             try {
                 com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.createLoanForUser(
@@ -1117,10 +1151,12 @@ public class Dashboard extends JFrame {
             return;
         }
         JTextField hari = createField("7");
-        int result = JOptionPane.showConfirmDialog(this, hari, "Lama pinjam (hari)", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        int result = JOptionPane.showConfirmDialog(this, hari, "Lama pinjam (hari)", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
         if (result == JOptionPane.OK_OPTION) {
             try {
-                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.requestLoan(id, Integer.parseInt(hari.getText().trim()));
+                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.requestLoan(id,
+                        Integer.parseInt(hari.getText().trim()));
                 showResponse(response.isSuccess(), response.getMessage());
                 showCurrentLoans();
             } catch (SQLException | NumberFormatException e) {
@@ -1131,10 +1167,12 @@ public class Dashboard extends JFrame {
 
     private void requestLoanFromDetail(int idBuku) {
         JTextField hari = createField("7");
-        int result = JOptionPane.showConfirmDialog(this, hari, "Lama pinjam (hari)", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        int result = JOptionPane.showConfirmDialog(this, hari, "Lama pinjam (hari)", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
         if (result == JOptionPane.OK_OPTION) {
             try {
-                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.requestLoan(idBuku, Integer.parseInt(hari.getText().trim()));
+                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.requestLoan(idBuku,
+                        Integer.parseInt(hari.getText().trim()));
                 showResponse(response.isSuccess(), response.getMessage());
                 if (response.isSuccess()) {
                     showCurrentLoans();
@@ -1171,9 +1209,8 @@ public class Dashboard extends JFrame {
         }
 
         JPanel panel = formPanel(
-                new String[]{"Username", "Nama", "Email", idUser == null ? "Password" : "Password baru"},
-                new JTextField[]{username, nama, email, password}
-        );
+                new String[] { "Username", "Nama", "Email", idUser == null ? "Password" : "Password baru" },
+                new JTextField[] { username, nama, email, password });
         if (idUser != null) {
             JLabel hint = new JLabel("Kosongkan password kalau tidak ingin mengganti password lama.");
             hint.setFont(new Font("Segoe UI", Font.PLAIN, 11));
@@ -1181,11 +1218,14 @@ public class Dashboard extends JFrame {
             panel.add(new JLabel(""));
             panel.add(hint);
         }
-        int result = JOptionPane.showConfirmDialog(this, panel, idUser == null ? "Tambah Anggota" : "Update Anggota", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        int result = JOptionPane.showConfirmDialog(this, panel, idUser == null ? "Tambah Anggota" : "Update Anggota",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
         if (result == JOptionPane.OK_OPTION) {
             try {
-                com.mycompany.perpustakaan.api.MemberRequest request = new com.mycompany.perpustakaan.api.MemberRequest(username.getText(), nama.getText(), email.getText(), password.getText());
-                com.mycompany.perpustakaan.api.MemberResponse response = idUser == null ? libraryApi.addMember(request) : libraryApi.updateMember(idUser, request);
+                com.mycompany.perpustakaan.api.MemberRequest request = new com.mycompany.perpustakaan.api.MemberRequest(
+                        username.getText(), nama.getText(), email.getText(), password.getText());
+                com.mycompany.perpustakaan.api.MemberResponse response = idUser == null ? libraryApi.addMember(request)
+                        : libraryApi.updateMember(idUser, request);
                 showResponse(response.isSuccess(), response.getMessage());
             } catch (SQLException e) {
                 showError("Gagal menyimpan anggota", e);
@@ -1212,7 +1252,8 @@ public class Dashboard extends JFrame {
             return;
         }
         try {
-            com.mycompany.perpustakaan.api.MemberResponse response = suspend ? libraryApi.suspendMember(id) : libraryApi.activateMember(id);
+            com.mycompany.perpustakaan.api.MemberResponse response = suspend ? libraryApi.suspendMember(id)
+                    : libraryApi.activateMember(id);
             showResponse(response.isSuccess(), response.getMessage());
             showMemberManagement();
         } catch (SQLException e) {
@@ -1225,7 +1266,8 @@ public class Dashboard extends JFrame {
         if (id == null) {
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this, "Hapus anggota ID " + id + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        int confirm = JOptionPane.showConfirmDialog(this, "Hapus anggota ID " + id + "?", "Konfirmasi",
+                JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
             try {
                 com.mycompany.perpustakaan.api.MemberResponse response = libraryApi.deleteMember(id);
@@ -1243,8 +1285,10 @@ public class Dashboard extends JFrame {
             return;
         }
         try {
-            com.mycompany.perpustakaan.api.ReportExportResponse response = libraryApi.exportInventoryReport(format, dir);
-            showResponse(response.isSuccess(), response.getMessage() + (response.getFilePath() == null ? "" : "\n" + response.getFilePath()));
+            com.mycompany.perpustakaan.api.ReportExportResponse response = libraryApi.exportInventoryReport(format,
+                    dir);
+            showResponse(response.isSuccess(),
+                    response.getMessage() + (response.getFilePath() == null ? "" : "\n" + response.getFilePath()));
         } catch (SQLException e) {
             showError("Gagal export inventory", e);
         }
@@ -1260,8 +1304,10 @@ public class Dashboard extends JFrame {
             return;
         }
         try {
-            com.mycompany.perpustakaan.api.ReportExportResponse response = libraryApi.exportLoanReport(format, dir, parseDate(start), parseDate(end));
-            showResponse(response.isSuccess(), response.getMessage() + (response.getFilePath() == null ? "" : "\n" + response.getFilePath()));
+            com.mycompany.perpustakaan.api.ReportExportResponse response = libraryApi.exportLoanReport(format, dir,
+                    parseDate(start), parseDate(end));
+            showResponse(response.isSuccess(),
+                    response.getMessage() + (response.getFilePath() == null ? "" : "\n" + response.getFilePath()));
         } catch (SQLException | DateTimeParseException e) {
             showError("Gagal export peminjaman", e);
         }
@@ -1279,7 +1325,8 @@ public class Dashboard extends JFrame {
         }
     }
 
-    private JPanel createSection(String title, List<com.mycompany.perpustakaan.api.BookSummary> books, boolean withArrow) {
+    private JPanel createSection(String title, List<com.mycompany.perpustakaan.api.BookSummary> books,
+            boolean withArrow) {
         JPanel section = new JPanel();
         section.setLayout(new BoxLayout(section, BoxLayout.Y_AXIS));
         section.setOpaque(false);
@@ -1388,7 +1435,8 @@ public class Dashboard extends JFrame {
             setPreferredSize(CARD_SIZE);
             setBackground(WHITE);
             setLayout(new BorderLayout());
-            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1), new EmptyBorder(0, 0, 10, 0)));
+            setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER_COLOR, 1),
+                    new EmptyBorder(0, 0, 10, 0)));
             setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
 
             JLabel cover = new JLabel();
@@ -1481,9 +1529,7 @@ public class Dashboard extends JFrame {
                 BorderFactory.createMatteBorder(0, 5, 0, 0, ACCENT),
                 BorderFactory.createCompoundBorder(
                         BorderFactory.createLineBorder(new Color(235, 235, 235)),
-                        new EmptyBorder(16, 18, 16, 18)
-                )
-        ));
+                        new EmptyBorder(16, 18, 16, 18))));
         JLabel titleLabel = new JLabel(title);
         titleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         titleLabel.setForeground(TEXT_GRAY);
@@ -1521,8 +1567,7 @@ public class Dashboard extends JFrame {
         panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, height + 28));
         panel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(234, 234, 234)),
-                new EmptyBorder(12, 12, 12, 12)
-        ));
+                new EmptyBorder(12, 12, 12, 12)));
         JScrollPane scroll = new JScrollPane(table);
         scroll.setPreferredSize(new Dimension(1500, height));
         scroll.setMinimumSize(new Dimension(900, height));
@@ -1590,8 +1635,7 @@ public class Dashboard extends JFrame {
             field.setFont(new Font("Segoe UI", Font.PLAIN, 13));
             field.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(new Color(210, 210, 210)),
-                    new EmptyBorder(7, 10, 7, 10)
-            ));
+                    new EmptyBorder(7, 10, 7, 10)));
 
             row.add(label);
             row.add(field);
@@ -1695,8 +1739,7 @@ public class Dashboard extends JFrame {
         cover.setBackground(WHITE);
         cover.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(TEXT_GRAY, 1),
-                new EmptyBorder(18, 18, 18, 18)
-        ));
+                new EmptyBorder(18, 18, 18, 18)));
 
         JLabel image = new JLabel();
         ImageIcon placeholder = loadBookCoverPlaceholder(width, height, 48);
@@ -1769,6 +1812,37 @@ public class Dashboard extends JFrame {
             GradientPaint gp = new GradientPaint(0, 0, start, getWidth(), getHeight(), end);
             g2d.setPaint(gp);
             g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
+            g2d.dispose();
+            super.paintComponent(g);
+        }
+    }
+
+    private class RoundedPanel extends JPanel {
+        private final int arc;
+        private final Color fillColor;
+        private final Color borderColor;
+        private final float borderWidth;
+
+        RoundedPanel(int arc, Color fillColor, Color borderColor, float borderWidth) {
+            this.arc = arc;
+            this.fillColor = fillColor;
+            this.borderColor = borderColor;
+            this.borderWidth = borderWidth;
+            setOpaque(false);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2d = (Graphics2D) g.create();
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            int inset = Math.max(2, Math.round(borderWidth));
+            g2d.setColor(fillColor);
+            g2d.fillRoundRect(inset, inset, getWidth() - (inset * 2), getHeight() - (inset * 2), arc, arc);
+            if (borderColor != null && borderWidth > 0) {
+                g2d.setColor(borderColor);
+                g2d.setStroke(new BasicStroke(borderWidth));
+                g2d.drawRoundRect(inset, inset, getWidth() - (inset * 2), getHeight() - (inset * 2), arc, arc);
+            }
             g2d.dispose();
             super.paintComponent(g);
         }
@@ -1847,7 +1921,8 @@ public class Dashboard extends JFrame {
         button.setBorderPainted(false);
         button.setBorder(new EmptyBorder(0, 0, 0, 0));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        button.addActionListener(e -> JOptionPane.showMessageDialog(this, "Belum ada notifikasi baru.", "Notifikasi", JOptionPane.INFORMATION_MESSAGE));
+        button.addActionListener(e -> JOptionPane.showMessageDialog(this, "Belum ada notifikasi baru.", "Notifikasi",
+                JOptionPane.INFORMATION_MESSAGE));
         return button;
     }
 
@@ -1888,7 +1963,7 @@ public class Dashboard extends JFrame {
         titlePanel.add(label, BorderLayout.WEST);
 
         JPanel accentLine = new JPanel();
-        accentLine.setPreferredSize(new Dimension(90, 4));
+        accentLine.setPreferredSize(new Dimension(90, 2));
         accentLine.setBackground(ACCENT);
 
         JPanel titleWrap = new JPanel();
@@ -1937,6 +2012,15 @@ public class Dashboard extends JFrame {
         }
         Image scaled = source.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
+    }
+
+    private ImageIcon loadBrandLogoIcon(int maxWidth, int maxHeight) {
+        java.net.URL resource = getClass().getResource("/assets/branding/library-logo.png");
+        if (resource == null) {
+            return null;
+        }
+        ImageIcon source = new ImageIcon(resource);
+        return new ImageIcon(scaleImageToFit(source, maxWidth, maxHeight));
     }
 
     private ImageIcon createSvgFallbackIcon(String resourcePath) {
@@ -2002,7 +2086,7 @@ public class Dashboard extends JFrame {
     }
 
     private ImageIcon loadBookCoverPlaceholder(int width, int height, int padding) {
-        String[] candidates = {"/assets/images/empty-book-cover.png", "/assets/images/empty-image.png"};
+        String[] candidates = { "/assets/images/empty-book-cover.png", "/assets/images/empty-image.png" };
         for (String candidate : candidates) {
             java.net.URL resource = getClass().getResource(candidate);
             if (resource != null) {
@@ -2040,24 +2124,309 @@ public class Dashboard extends JFrame {
     }
 
     private void showProfile() {
+        resetContent();
+
         com.mycompany.perpustakaan.api.UserSummary profile = libraryApi.getCurrentUser();
         if (profile == null) {
             JOptionPane.showMessageDialog(this, "Belum ada user yang login.", "Profil", JOptionPane.WARNING_MESSAGE);
+            refreshContent();
             return;
         }
 
-        String message = "Nama: " + profile.getNama()
-                + "\nUsername: " + profile.getUsername()
-                + "\nEmail: " + profile.getEmail()
-                + "\nRole: " + profile.getRole()
-                + "\nStatus: " + profile.getStatusAkun();
-        Object[] options = {"Tutup", "Logout"};
-        int choice = JOptionPane.showOptionDialog(this, message, "Profil", JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
-        if (choice == 1) {
-            libraryApi.logout();
-            new LoginForm(libraryApi).setVisible(true);
-            dispose();
+        JPanel page = new JPanel();
+        page.setOpaque(false);
+        page.setLayout(new BoxLayout(page, BoxLayout.Y_AXIS));
+        page.setAlignmentX(Component.LEFT_ALIGNMENT);
+        page.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+
+        JLabel title = new JLabel("User Profile");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 30));
+        title.setForeground(TEXT_DARK);
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel subtitle = new JLabel("Kelola informasi akun dan akses perpustakaan kamu.");
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        subtitle.setForeground(TEXT_GRAY);
+        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        page.add(title);
+        page.add(Box.createVerticalStrut(6));
+        page.add(subtitle);
+        page.add(Box.createVerticalStrut(24));
+
+        JPanel mainCard = new RoundedPanel(26, WHITE, new Color(235, 235, 235), 1f);
+        mainCard.setLayout(new BorderLayout(28, 0));
+        mainCard.setBorder(new EmptyBorder(28, 30, 28, 30));
+        mainCard.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mainCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 360));
+
+        mainCard.add(createProfileLeftPanel(profile), BorderLayout.WEST);
+        mainCard.add(createProfileInfoPanel(profile), BorderLayout.CENTER);
+        mainCard.add(createProfileLogoPanel(), BorderLayout.EAST);
+
+        page.add(mainCard);
+        page.add(Box.createVerticalStrut(20));
+
+        JPanel bottom = new JPanel(new GridLayout(1, 3, 16, 0));
+        bottom.setOpaque(false);
+        bottom.setAlignmentX(Component.LEFT_ALIGNMENT);
+        bottom.setMaximumSize(new Dimension(Integer.MAX_VALUE, 150));
+
+        bottom.add(createProfileQuickCard(
+                "Role Aktif",
+                displayRole(),
+                "Hak akses yang sedang digunakan pada sistem."));
+
+        bottom.add(createProfileQuickCard(
+                "Username",
+                safeOrDash(profile.getUsername()),
+                "Digunakan untuk login ke aplikasi perpustakaan."));
+
+        bottom.add(createProfileQuickCard(
+                "Status",
+                "Aktif",
+                "Akun siap digunakan untuk mengakses fitur."));
+
+        page.add(bottom);
+        page.add(Box.createVerticalStrut(22));
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        actions.setOpaque(false);
+        actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JButton back = createNeutralButton("Kembali");
+        JButton dashboard = createActionButton("Ke Dashboard");
+
+        back.addActionListener(e -> showDashboard());
+        dashboard.addActionListener(e -> showDashboard());
+
+        actions.add(back);
+        actions.add(dashboard);
+
+        page.add(actions);
+
+        contentPanel.add(page);
+        refreshContent();
+    }
+
+    private JPanel createProfileLeftPanel(com.mycompany.perpustakaan.api.UserSummary profile) {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setPreferredSize(new Dimension(240, 300));
+
+        JLabel avatar = new JLabel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                GradientPaint gp = new GradientPaint(
+                        0, 0, ACCENT,
+                        getWidth(), getHeight(), ACCENT_DARK);
+                g2d.setPaint(gp);
+                g2d.fillOval(0, 0, getWidth() - 1, getHeight() - 1);
+
+                g2d.setColor(new Color(255, 255, 255, 70));
+                g2d.setStroke(new BasicStroke(3f));
+                g2d.drawOval(7, 7, getWidth() - 15, getHeight() - 15);
+
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+
+        avatar.setOpaque(false);
+        avatar.setPreferredSize(new Dimension(112, 112));
+        avatar.setMaximumSize(new Dimension(112, 112));
+        avatar.setMinimumSize(new Dimension(112, 112));
+        avatar.setHorizontalAlignment(SwingConstants.CENTER);
+
+        String initial = getInitial(profile.getNama());
+        avatar.setText(initial);
+        avatar.setForeground(WHITE);
+        avatar.setFont(new Font("Segoe UI", Font.BOLD, 38));
+        avatar.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel name = new JLabel(safeOrDash(profile.getNama()));
+        name.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        name.setForeground(TEXT_DARK);
+        name.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel username = new JLabel("@" + safeOrDash(profile.getUsername()));
+        username.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        username.setForeground(TEXT_GRAY);
+        username.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel roleBadge = new JLabel(displayRole());
+        roleBadge.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        roleBadge.setForeground(ACCENT_DARK);
+        roleBadge.setOpaque(true);
+        roleBadge.setBackground(ACCENT_SOFT);
+        roleBadge.setBorder(new EmptyBorder(7, 14, 7, 14));
+        roleBadge.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        panel.add(Box.createVerticalGlue());
+        panel.add(avatar);
+        panel.add(Box.createVerticalStrut(16));
+        panel.add(name);
+        panel.add(Box.createVerticalStrut(4));
+        panel.add(username);
+        panel.add(Box.createVerticalStrut(14));
+        panel.add(roleBadge);
+        panel.add(Box.createVerticalGlue());
+
+        return panel;
+    }
+
+    private JPanel createProfileInfoPanel(com.mycompany.perpustakaan.api.UserSummary profile) {
+        JPanel panel = new JPanel();
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(new EmptyBorder(10, 8, 10, 8));
+
+        JLabel sectionTitle = new JLabel("Informasi Akun");
+        sectionTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        sectionTitle.setForeground(TEXT_DARK);
+        sectionTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel sectionDesc = new JLabel("Data utama pengguna yang sedang login.");
+        sectionDesc.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        sectionDesc.setForeground(TEXT_GRAY);
+        sectionDesc.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        panel.add(sectionTitle);
+        panel.add(Box.createVerticalStrut(4));
+        panel.add(sectionDesc);
+        panel.add(Box.createVerticalStrut(20));
+
+        JPanel grid = new JPanel(new GridLayout(2, 2, 14, 14));
+        grid.setOpaque(false);
+        grid.setAlignmentX(Component.LEFT_ALIGNMENT);
+        grid.setMaximumSize(new Dimension(560, 170));
+
+        grid.add(createProfileInfoItem("Nama Lengkap", safeOrDash(profile.getNama())));
+        grid.add(createProfileInfoItem("Username", safeOrDash(profile.getUsername())));
+        grid.add(createProfileInfoItem("Role", displayRole()));
+        grid.add(createProfileInfoItem("Akses", isStaffOrAdmin() ? "Management Access" : "Member Access"));
+
+        panel.add(grid);
+        panel.add(Box.createVerticalStrut(18));
+
+        JLabel note = new JLabel("<html><div style='width:520px;'>"
+                + "Profil ini mengikuti data akun yang sedang login. Untuk perubahan data akun, gunakan fitur manajemen user/member sesuai role."
+                + "</div></html>");
+        note.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        note.setForeground(TEXT_GRAY);
+        note.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        panel.add(note);
+
+        return panel;
+    }
+
+    private JPanel createProfileInfoItem(String labelText, String valueText) {
+        JPanel item = new RoundedPanel(18, SURFACE_ALT, new Color(238, 238, 238), 1f);
+        item.setLayout(new BorderLayout(0, 5));
+        item.setBorder(new EmptyBorder(14, 16, 14, 16));
+
+        JLabel label = new JLabel(labelText);
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        label.setForeground(TEXT_GRAY);
+
+        JLabel value = new JLabel(safeOrDash(valueText));
+        value.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        value.setForeground(TEXT_DARK);
+
+        item.add(label, BorderLayout.NORTH);
+        item.add(value, BorderLayout.CENTER);
+
+        return item;
+    }
+
+    private JPanel createProfileLogoPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setOpaque(false);
+        panel.setPreferredSize(new Dimension(230, 300));
+
+        JPanel logoCard = new RoundedPanel(24, ACCENT_SOFT, new Color(255, 222, 210), 1f);
+        logoCard.setLayout(new BoxLayout(logoCard, BoxLayout.Y_AXIS));
+        logoCard.setBorder(new EmptyBorder(24, 24, 24, 24));
+
+        JLabel logo = new JLabel();
+        ImageIcon brandLogo = loadBrandLogoIcon(150, 110);
+        if (brandLogo != null) {
+            logo.setIcon(brandLogo);
+        } else {
+            logo.setText("LIBRARY HUB");
+            logo.setFont(new Font("Segoe UI", Font.BOLD, 18));
+            logo.setForeground(ACCENT_DARK);
         }
+
+        logo.setHorizontalAlignment(SwingConstants.CENTER);
+        logo.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel appName = new JLabel("Library Hub");
+        appName.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        appName.setForeground(TEXT_DARK);
+        appName.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel desc = new JLabel("<html><div style='text-align:center; width:160px;'>"
+                + "Sistem perpustakaan digital yang simple, rapi, dan mudah digunakan."
+                + "</div></html>");
+        desc.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        desc.setForeground(TEXT_GRAY);
+        desc.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        logoCard.add(Box.createVerticalGlue());
+        logoCard.add(logo);
+        logoCard.add(Box.createVerticalStrut(18));
+        logoCard.add(appName);
+        logoCard.add(Box.createVerticalStrut(8));
+        logoCard.add(desc);
+        logoCard.add(Box.createVerticalGlue());
+
+        panel.add(logoCard, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JPanel createProfileQuickCard(String title, String value, String description) {
+        JPanel card = new RoundedPanel(20, WHITE, new Color(235, 235, 235), 1f);
+        card.setLayout(new BorderLayout(0, 8));
+        card.setBorder(new EmptyBorder(18, 20, 18, 20));
+
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        titleLabel.setForeground(TEXT_GRAY);
+
+        JLabel valueLabel = new JLabel(safeOrDash(value));
+        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        valueLabel.setForeground(TEXT_DARK);
+
+        JLabel descLabel = new JLabel("<html><div style='width:260px;'>"
+                + escapeHtml(description)
+                + "</div></html>");
+        descLabel.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        descLabel.setForeground(TEXT_GRAY);
+
+        card.add(titleLabel, BorderLayout.NORTH);
+        card.add(valueLabel, BorderLayout.CENTER);
+        card.add(descLabel, BorderLayout.SOUTH);
+
+        return card;
+    }
+
+    private String getInitial(String name) {
+        if (name == null || name.isBlank()) {
+            return "U";
+        }
+
+        String[] parts = name.trim().split("\\s+");
+        if (parts.length == 1) {
+            return parts[0].substring(0, 1).toUpperCase();
+        }
+
+        return (parts[0].substring(0, 1) + parts[parts.length - 1].substring(0, 1)).toUpperCase();
     }
 
     private void showBookshelf() {
@@ -2094,7 +2463,7 @@ public class Dashboard extends JFrame {
 
         } catch (SQLException e) {
             showError("Gagal memuat bookshelf", e);
-            String[] fallback = {"SCI-FI", "FANTASY", "ECONOMY", "LAW"};
+            String[] fallback = { "SCI-FI", "FANTASY", "ECONOMY", "LAW" };
             for (int i = 0; i < fallback.length; i++) {
                 contentPanel.add(createCategorySection(fallback[i]));
                 if (i < fallback.length - 1) {
@@ -2266,8 +2635,8 @@ public class Dashboard extends JFrame {
             String safeKeyword = currentKeyword.isBlank() ? null : currentKeyword;
             String safeCategory = "Semua kategori".equals(currentCategory) ? null : currentCategory;
 
-            com.mycompany.perpustakaan.api.BookshelfPage page =
-                    libraryApi.getBookshelfPage(safeKeyword, safeCategory, 1, 20);
+            com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage(safeKeyword, safeCategory,
+                    1, 20);
 
             List<com.mycompany.perpustakaan.api.BookSummary> books = page.getBooks();
 
@@ -2321,8 +2690,7 @@ public class Dashboard extends JFrame {
         HorizontalScrollPanel scrollPanel = new HorizontalScrollPanel();
 
         try {
-            com.mycompany.perpustakaan.api.BookshelfPage page =
-                    libraryApi.getBookshelfPage(null, category, 1, 8);
+            com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage(null, category, 1, 8);
 
             List<com.mycompany.perpustakaan.api.BookSummary> books = page.getBooks();
 
@@ -2464,11 +2832,13 @@ public class Dashboard extends JFrame {
     }
 
     private void showResponse(boolean success, String message) {
-        JOptionPane.showMessageDialog(this, message, success ? "Berhasil" : "Gagal", success ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
+        JOptionPane.showMessageDialog(this, message, success ? "Berhasil" : "Gagal",
+                success ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
     }
 
     private void showError(String message, Exception exception) {
-        JOptionPane.showMessageDialog(this, message + ": " + exception.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(this, message + ": " + exception.getMessage(), "Error",
+                JOptionPane.ERROR_MESSAGE);
         logger.log(java.util.logging.Level.SEVERE, message, exception);
     }
 
