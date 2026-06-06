@@ -1391,7 +1391,7 @@ public class Dashboard extends JFrame {
             setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
 
             JLabel cover = new JLabel();
-            ImageIcon placeholder = loadBookCoverPlaceholder();
+            ImageIcon placeholder = loadBookCoverPlaceholder(160, 100, 18);
             if (placeholder != null) {
                 cover.setIcon(placeholder);
             } else {
@@ -1698,10 +1698,9 @@ public class Dashboard extends JFrame {
         ));
 
         JLabel image = new JLabel();
-        ImageIcon placeholder = loadBookCoverPlaceholder();
+        ImageIcon placeholder = loadBookCoverPlaceholder(width, height, 48);
         if (placeholder != null) {
-            Image scaled = placeholder.getImage().getScaledInstance(Math.min(130, width - 60), Math.min(110, height - 80), Image.SCALE_SMOOTH);
-            image.setIcon(new ImageIcon(scaled));
+            image.setIcon(placeholder);
         } else {
             image.setText("No Image");
             image.setForeground(TEXT_GRAY);
@@ -1954,17 +1953,32 @@ public class Dashboard extends JFrame {
         g2d.drawLine(8, 16, 12, 16);
     }
 
-    private ImageIcon loadBookCoverPlaceholder() {
+    private ImageIcon loadBookCoverPlaceholder(int width, int height, int padding) {
         String[] candidates = {"/assets/images/empty-book-cover.png", "/assets/images/empty-image.png"};
         for (String candidate : candidates) {
             java.net.URL resource = getClass().getResource(candidate);
             if (resource != null) {
                 ImageIcon source = new ImageIcon(resource);
-                Image scaled = source.getImage().getScaledInstance(160, 100, Image.SCALE_SMOOTH);
+                int maxWidth = Math.max(1, width - (padding * 2));
+                int maxHeight = Math.max(1, height - (padding * 2));
+                Image scaled = scaleImageToFit(source, maxWidth, maxHeight);
                 return new ImageIcon(scaled);
             }
         }
         return null;
+    }
+
+    private Image scaleImageToFit(ImageIcon source, int maxWidth, int maxHeight) {
+        int sourceWidth = source.getIconWidth();
+        int sourceHeight = source.getIconHeight();
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+            return source.getImage().getScaledInstance(maxWidth, maxHeight, Image.SCALE_SMOOTH);
+        }
+
+        double scale = Math.min((double) maxWidth / sourceWidth, (double) maxHeight / sourceHeight);
+        int targetWidth = Math.max(1, (int) Math.round(sourceWidth * scale));
+        int targetHeight = Math.max(1, (int) Math.round(sourceHeight * scale));
+        return source.getImage().getScaledInstance(targetWidth, targetHeight, Image.SCALE_SMOOTH);
     }
 
     private void loadUserData() {
