@@ -113,7 +113,7 @@ public class LoginForm extends JFrame {
         gbc.insets = new Insets(0, 0, 10, 0);
         JLabel logo = new JLabel();
         try {
-            ImageIcon icon = new ImageIcon(getClass().getResource("/logo3.png"));
+            ImageIcon icon = new ImageIcon(getClass().getResource("/assets/branding/library-logo.png"));
             logo.setIcon(icon);
         } catch (Exception e) {
             logo.setText("📚 LIBRARY HUB");

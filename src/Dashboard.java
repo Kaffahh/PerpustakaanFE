@@ -137,7 +137,7 @@ public class Dashboard extends JFrame {
 
             JLabel logo = new JLabel();
             try {
-                logo.setIcon(new ImageIcon(getClass().getResource("/logo3.png")));
+                logo.setIcon(new ImageIcon(getClass().getResource("/assets/branding/library-logo.png")));
             } catch (Exception e) {
                 logo.setText("LIBRARY HUB");
                 logo.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -155,30 +155,30 @@ public class Dashboard extends JFrame {
             add(menuTitle);
             add(Box.createVerticalStrut(10));
 
-            addMenuButton("Dashboard", "/icon-dashboard.png", e -> showDashboard());
+            addMenuButton("Dashboard", "/assets/icons/icon-dashboard.png", e -> showDashboard());
 
             if (isAdmin()) {
-                addMenuButton("Admin Report", "/Control Panel.svg", e -> showAdminDashboard());
-                addMenuButton("Inventory", "/Book.svg", e -> showInventoryReport());
-                addMenuButton("Loan Report", "/Homework.svg", e -> showLoanReport());
-                addMenuButton("Buku Populer", "/icon-history.png", e -> showPopularBookReport());
-                addMenuButton("Tambah Buku", "/icon-loan.png", e -> showAddBookDialog());
+                addMenuButton("Admin Report", "/assets/icons/icon-admin-report.svg", e -> showAdminDashboard());
+                addMenuButton("Inventory", "/assets/icons/icon-book.svg", e -> showInventoryReport());
+                addMenuButton("Loan Report", "/assets/icons/icon-loan-report.svg", e -> showLoanReport());
+                addMenuButton("Buku Populer", "/assets/icons/icon-history.png", e -> showPopularBookReport());
+                addMenuButton("Tambah Buku", "/assets/icons/icon-loan.png", e -> showAddBookDialog());
             }
 
             if (isStaffOrAdmin()) {
-                addMenuButton("Pending Request", "/Homework.svg", e -> showPendingLoanRequests());
-                addMenuButton("Manajemen Buku", "/icon-bookshelf.png", e -> showBookManagement());
-                addMenuButton("Loans & Returns", "/icon-loan.png", e -> showLoanManagement());
-                addMenuButton("Members", "/icon-member.svg", e -> showMemberManagement());
+                addMenuButton("Pending Request", "/assets/icons/icon-loan-report.svg", e -> showPendingLoanRequests());
+                addMenuButton("Manajemen Buku", "/assets/icons/icon-bookshelf.png", e -> showBookManagement());
+                addMenuButton("Loans & Returns", "/assets/icons/icon-loan.png", e -> showLoanManagement());
+                addMenuButton("Members", "/assets/icons/icon-member.svg", e -> showMemberManagement());
             } else {
-                addMenuButton("Bookshelf", "/icon-bookshelf.png", e -> showBookshelf());
-                addMenuButton("Pinjam Buku", "/icon-loan.png", e -> showRequestLoan());
-                addMenuButton("Pinjaman Aktif", "/Homework.svg", e -> showCurrentLoans());
-                addMenuButton("History", "/icon-history.png", e -> showUserHistory());
-                addMenuButton("Kunjungan", "/Time Machine.svg", e -> showVisitForm());
+                addMenuButton("Bookshelf", "/assets/icons/icon-bookshelf.png", e -> showBookshelf());
+                addMenuButton("Pinjam Buku", "/assets/icons/icon-loan.png", e -> showRequestLoan());
+                addMenuButton("Pinjaman Aktif", "/assets/icons/icon-loan-report.svg", e -> showCurrentLoans());
+                addMenuButton("History", "/assets/icons/icon-history.png", e -> showUserHistory());
+                addMenuButton("Kunjungan", "/assets/icons/icon-visit.svg", e -> showVisitForm());
             }
 
-            addMenuButton("User Profile", "/icon-profile.png", e -> showProfile());
+            addMenuButton("User Profile", "/assets/icons/icon-profile.png", e -> showProfile());
             add(Box.createVerticalGlue());
             add(createLogoutButton());
             add(Box.createVerticalStrut(18));
@@ -267,7 +267,7 @@ public class Dashboard extends JFrame {
 
             JLabel avatar = new JLabel();
             try {
-                avatar.setIcon(new ImageIcon(getClass().getResource("/PROFILE2.png")));
+                avatar.setIcon(new ImageIcon(getClass().getResource("/assets/images/profile-avatar.png")));
             } catch (Exception e) {
                 avatar.setText("USER");
                 avatar.setFont(new Font("Segoe UI", Font.PLAIN, 18));
@@ -1777,7 +1777,7 @@ public class Dashboard extends JFrame {
     private JButton createNotificationButton() {
         JButton button = new JButton();
         try {
-            button.setIcon(new ImageIcon(getClass().getResource("/LONCENG.png")));
+            button.setIcon(new ImageIcon(getClass().getResource("/assets/icons/icon-notification.png")));
         } catch (Exception e) {
             button.setText("Notif");
             button.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -1873,34 +1873,45 @@ public class Dashboard extends JFrame {
     }
 
     private ImageIcon loadMenuIcon(String resourcePath) {
+        return loadIconResource(resourcePath, 22, 22);
+    }
+
+    private ImageIcon loadIconResource(String resourcePath, int width, int height) {
         java.net.URL resource = getClass().getResource(resourcePath);
         if (resource == null) {
             return null;
         }
         if (resourcePath.toLowerCase().endsWith(".svg")) {
-            return createSvgFallbackIcon(resourcePath);
+            return createSvgFallbackIcon(resourcePath, width, height);
         }
         ImageIcon source = new ImageIcon(resource);
         if (source.getIconWidth() <= 0 || source.getIconHeight() <= 0) {
-            return createSvgFallbackIcon(resourcePath);
+            return createSvgFallbackIcon(resourcePath, width, height);
         }
-        Image scaled = source.getImage().getScaledInstance(22, 22, Image.SCALE_SMOOTH);
+        Image scaled = source.getImage().getScaledInstance(width, height, Image.SCALE_SMOOTH);
         return new ImageIcon(scaled);
     }
 
     private ImageIcon createSvgFallbackIcon(String resourcePath) {
-        BufferedImage image = new BufferedImage(22, 22, BufferedImage.TYPE_INT_ARGB);
+        return createSvgFallbackIcon(resourcePath, 22, 22);
+    }
+
+    private ImageIcon createSvgFallbackIcon(String resourcePath, int width, int height) {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = image.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2d.setColor(TEXT_DARK);
 
         String name = resourcePath.toLowerCase();
-        if (name.contains("member") || name.contains("customer")) {
+        if (name.contains("search")) {
+            drawSearchIcon(g2d, width, height);
+        } else if (name.contains("member") || name.contains("customer")) {
             drawMemberIcon(g2d);
         } else if (name.contains("book")) {
             drawBookIcon(g2d);
-        } else if (name.contains("homework") || name.contains("control") || name.contains("time")) {
+        } else if (name.contains("homework") || name.contains("control") || name.contains("time")
+                || name.contains("report") || name.contains("loan") || name.contains("visit")) {
             drawReportIcon(g2d);
         } else {
             g2d.fillRoundRect(4, 4, 14, 14, 3, 3);
@@ -1908,6 +1919,17 @@ public class Dashboard extends JFrame {
 
         g2d.dispose();
         return new ImageIcon(image);
+    }
+
+    private void drawSearchIcon(Graphics2D g2d, int width, int height) {
+        int size = Math.min(width, height);
+        int lens = Math.max(7, size / 2);
+        int lensX = Math.max(2, size / 5);
+        int lensY = Math.max(2, size / 5);
+        g2d.drawOval(lensX, lensY, lens, lens);
+        int handleStart = lensX + lens - 1;
+        int handleY = lensY + lens - 1;
+        g2d.drawLine(handleStart, handleY, size - 3, size - 3);
     }
 
     private void drawMemberIcon(Graphics2D g2d) {
@@ -1933,7 +1955,7 @@ public class Dashboard extends JFrame {
     }
 
     private ImageIcon loadBookCoverPlaceholder() {
-        String[] candidates = {"/empty-img.png", "/empty-image.png"};
+        String[] candidates = {"/assets/images/empty-book-cover.png", "/assets/images/empty-image.png"};
         for (String candidate : candidates) {
             java.net.URL resource = getClass().getResource(candidate);
             if (resource != null) {
@@ -2051,9 +2073,7 @@ public class Dashboard extends JFrame {
         searchField.setBorder(new EmptyBorder(10, 40, 10, 20));
 
         // Icon search di dalam field
-        JLabel searchIcon = new JLabel("🔍");
-        searchIcon.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        searchIcon.setForeground(TEXT_GRAY);
+        JLabel searchIcon = new JLabel(loadIconResource("/assets/icons/icon-search.svg", 18, 18));
         searchIcon.setBounds(12, 10, 24, 24);
 
         JPanel searchWrapper = new JPanel(null);
