@@ -24,6 +24,7 @@ import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.ButtonModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -1674,15 +1675,15 @@ public class Dashboard extends JFrame {
     }
 
     private JButton createNeutralButton(String text) {
-        JButton button = new JButton(text);
+        JButton button = new OutlineButton(text);
         button.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        button.setForeground(TEXT_DARK);
-        button.setBackground(new Color(245, 245, 245));
+        button.setForeground(ACCENT_DARK);
+        button.setBackground(WHITE);
         button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(TEXT_GRAY, 1),
-                new EmptyBorder(8, 18, 8, 18)
-        ));
+        button.setContentAreaFilled(false);
+        button.setBorderPainted(false);
+        button.setOpaque(false);
+        button.setBorder(new EmptyBorder(9, 18, 9, 18));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         return button;
     }
@@ -1769,6 +1770,33 @@ public class Dashboard extends JFrame {
             g2d.setPaint(gp);
             g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
             g2d.dispose();
+            super.paintComponent(g);
+        }
+    }
+
+    private class OutlineButton extends JButton {
+        OutlineButton(String text) {
+            super(text);
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2d = (Graphics2D) g.create();
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            ButtonModel model = getModel();
+            Color borderColor = model.isPressed() ? ACCENT_DARK : ACCENT;
+            Color fillColor = model.isPressed()
+                    ? new Color(255, 231, 222)
+                    : model.isRollover() ? new Color(255, 246, 242) : WHITE;
+
+            g2d.setColor(fillColor);
+            g2d.fillRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 12, 12);
+            g2d.setColor(borderColor);
+            g2d.setStroke(new BasicStroke(1.4f));
+            g2d.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 12, 12);
+            g2d.dispose();
+
             super.paintComponent(g);
         }
     }
