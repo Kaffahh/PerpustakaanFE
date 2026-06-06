@@ -165,7 +165,6 @@ public class LoginForm extends JFrame {
         JPanel info = new JPanel(new GridBagLayout());
         info.setOpaque(false);
 
-        
         gbc.gridy = 3;
         gbc.insets = new Insets(0, 0, 0, 0);
         panel.add(info, gbc);
@@ -306,6 +305,7 @@ public class LoginForm extends JFrame {
         linkLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
         linkLabel.setForeground(ACCENT);
         linkLabel.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+
         linkLabel.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
@@ -314,12 +314,12 @@ public class LoginForm extends JFrame {
 
             @Override
             public void mouseEntered(java.awt.event.MouseEvent e) {
-                linkLabel.setText("<html><u>Daftar di sini</u></html>");
+                linkLabel.setForeground(ACCENT_DARK);
             }
 
             @Override
             public void mouseExited(java.awt.event.MouseEvent e) {
-                linkLabel.setText("Daftar di sini");
+                linkLabel.setForeground(ACCENT);
             }
         });
 

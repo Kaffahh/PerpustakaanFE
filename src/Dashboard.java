@@ -1410,26 +1410,86 @@ public class Dashboard extends JFrame {
         }
         resetContent();
         addTitle("Request Pinjam Buku");
-        try {
-            com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage("", "", 1, 50);
-            DefaultTableModel model = new DefaultTableModel(
-                    new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Stok" }, 0);
-            for (com.mycompany.perpustakaan.api.BookSummary book : page.getBooks()) {
-                model.addRow(new Object[] { book.getIdBuku(), book.getKodeBuku(), book.getJudul(), book.getPenulis(),
-                        book.getKategori(), book.getStokTersedia() });
+
+        JTextField search = createModernSearchField("Cari judul / penulis / kode buku...");
+        JComboBox<String> category = new JComboBox<>(loadCategoryOptions());
+        category.setPreferredSize(new Dimension(180, 38));
+        category.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JButton cari = createActionButton("Cari");
+        JButton refresh = createNeutralButton("Refresh");
+
+        JPanel toolbar = createToolbarPanel();
+        toolbar.add(search);
+        toolbar.add(category);
+        toolbar.add(cari);
+        toolbar.add(refresh);
+        contentPanel.add(toolbar);
+        contentPanel.add(Box.createVerticalStrut(15));
+
+        JPanel tableHolder = createDynamicContentPanel();
+        JPanel actionHolder = createDynamicContentPanel();
+        contentPanel.add(tableHolder);
+        contentPanel.add(actionHolder);
+
+        final Runnable[] render = new Runnable[1];
+        render[0] = () -> {
+            tableHolder.removeAll();
+            actionHolder.removeAll();
+            try {
+                String keyword = searchText(search, "Cari judul / penulis / kode buku...");
+                Object selectedCategory = category.getSelectedItem();
+                String categoryValue = selectedCategory == null || "Semua kategori".equals(selectedCategory.toString())
+                        ? ""
+                        : selectedCategory.toString();
+                com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage(keyword, categoryValue, 1, 50);
+                DefaultTableModel model = createRequestLoanTableModel(page.getBooks());
+                JTable table = createTable(model);
+                tableHolder.add(wrapTable(table, 520));
+
+                JButton request = createActionButton("Request Pinjam Buku Terpilih");
+                request.addActionListener(e -> requestSelectedLoan(table));
+                JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 10));
+                footer.setOpaque(false);
+                footer.add(request);
+                actionHolder.add(footer);
+                refreshContent();
+            } catch (SQLException e) {
+                showError("Gagal memuat buku", e);
             }
-            JTable table = createTable(model);
-            contentPanel.add(wrapTable(table, 520));
-            JButton request = createActionButton("Request Pinjam Buku Terpilih");
-            request.addActionListener(e -> requestSelectedLoan(table));
-            JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 10));
-            footer.setOpaque(false);
-            footer.add(request);
-            contentPanel.add(footer);
-        } catch (SQLException e) {
-            showError("Gagal memuat buku", e);
-        }
+        };
+
+        cari.addActionListener(e -> render[0].run());
+        search.addActionListener(e -> render[0].run());
+        category.addActionListener(e -> render[0].run());
+        refresh.addActionListener(e -> {
+            search.setText("Cari judul / penulis / kode buku...");
+            search.setForeground(TEXT_GRAY);
+            category.setSelectedItem("Semua kategori");
+            render[0].run();
+        });
+        render[0].run();
         refreshContent();
+    }
+
+    private DefaultTableModel createRequestLoanTableModel(List<com.mycompany.perpustakaan.api.BookSummary> books) {
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Stok" }, 0);
+        if (books == null || books.isEmpty()) {
+            model.addRow(new Object[] { "-", "-", "Tidak ada buku yang cocok", "-", "-", "-" });
+            return model;
+        }
+
+        for (com.mycompany.perpustakaan.api.BookSummary book : books) {
+            model.addRow(new Object[] {
+                    book.getIdBuku(),
+                    safeOrDash(book.getKodeBuku()),
+                    safeOrDash(book.getJudul()),
+                    safeOrDash(book.getPenulis()),
+                    safeOrDash(book.getKategori()),
+                    book.getStokTersedia()
+            });
+        }
+        return model;
     }
 
     private void showCurrentLoans() {
@@ -1458,20 +1518,59 @@ public class Dashboard extends JFrame {
         }
         resetContent();
         addTitle("History Peminjaman Saya");
-        try {
-            com.mycompany.perpustakaan.api.HistoryPage page = libraryApi.getLoanHistory("semua", 1, 50);
-            DefaultTableModel model = new DefaultTableModel(
-                    new Object[] { "ID", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda" }, 0);
-            for (com.mycompany.perpustakaan.api.LoanSummary loan : page.getLoans()) {
-                model.addRow(new Object[] { loan.getIdPeminjaman(), loan.getJudulBuku(), loan.getTanggalPinjam(),
-                        loan.getTanggalJatuhTempo(), loan.getTanggalKembali(), loan.getStatus(),
-                        formatMoney(loan.getDendaBerjalan()) });
+
+        JPanel toolbar = createToolbarPanel();
+        JComboBox<String> status = new JComboBox<>(new String[] { "semua", "dipinjam", "dikembalikan", "terlambat" });
+        status.setPreferredSize(new Dimension(170, 38));
+        status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JButton load = createActionButton("Tampilkan");
+        toolbar.add(new JLabel("Status"));
+        toolbar.add(status);
+        toolbar.add(load);
+        contentPanel.add(toolbar);
+        contentPanel.add(Box.createVerticalStrut(15));
+
+        JPanel tableHolder = createDynamicContentPanel();
+        contentPanel.add(tableHolder);
+
+        Runnable render = () -> {
+            tableHolder.removeAll();
+            try {
+                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                com.mycompany.perpustakaan.api.HistoryPage page = libraryApi.getLoanHistory(selectedStatus, 1, 50);
+                tableHolder.add(createTablePanel(createLoanHistoryTableModel(page.getLoans()), 520));
+                refreshContent();
+            } catch (SQLException e) {
+                showError("Gagal memuat history", e);
             }
-            contentPanel.add(createTablePanel(model, 520));
-        } catch (SQLException e) {
-            showError("Gagal memuat history", e);
-        }
+        };
+
+        load.addActionListener(e -> render.run());
+        status.addActionListener(e -> render.run());
+        render.run();
         refreshContent();
+    }
+
+    private DefaultTableModel createLoanHistoryTableModel(List<com.mycompany.perpustakaan.api.LoanSummary> loans) {
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[] { "ID", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda" }, 0);
+        if (loans == null || loans.isEmpty()) {
+            model.addRow(new Object[] { "-", "Belum ada history untuk filter ini", "-", "-", "-", "-", "-" });
+            return model;
+        }
+
+        for (com.mycompany.perpustakaan.api.LoanSummary loan : loans) {
+            model.addRow(new Object[] {
+                    loan.getIdPeminjaman(),
+                    loan.getJudulBuku(),
+                    loan.getTanggalPinjam(),
+                    loan.getTanggalJatuhTempo(),
+                    loan.getTanggalKembali(),
+                    loan.getStatus(),
+                    formatMoney(loan.getDendaBerjalan())
+            });
+        }
+        return model;
     }
 
     private void showVisitForm() {
@@ -1735,34 +1834,108 @@ public class Dashboard extends JFrame {
         contentPanel.add(actions);
         contentPanel.add(Box.createVerticalStrut(16));
 
-        DefaultTableModel model = new DefaultTableModel(
-                new Object[] { "ID", "Nama Pengunjung", "Jenis", "Asal Instansi", "Keperluan", "Status", "Tanggal" },
-                0);
-
         try {
             List<com.mycompany.perpustakaan.api.VisitSummary> visits = libraryApi.getRecentVisits(100);
-            if (visits.isEmpty()) {
-                model.addRow(new Object[] { "-", "Belum ada data", "-", "-", "-", "-", "-" });
-            } else {
-                for (com.mycompany.perpustakaan.api.VisitSummary visit : visits) {
-                    model.addRow(new Object[] {
-                            visit.getIdKunjungan(),
-                            safeOrDash(visit.getNamaPengunjung()),
-                            safeOrDash(visit.getJenisPengunjung()),
-                            safeOrDash(visit.getAsalInstansi()),
-                            safeOrDash(visit.getKeperluan()),
-                            safeOrDash(visit.getStatusKunjungan()),
-                            safeOrDash(visit.getTanggalKunjungan())
-                    });
-                }
-            }
+            JTable table = createTable(createVisitManagementTableModel(visits));
+            contentPanel.add(wrapTable(table, 420));
+            contentPanel.add(Box.createVerticalStrut(10));
+            contentPanel.add(createVisitManagementActions(table));
         } catch (SQLException e) {
             showError("Gagal memuat data kunjungan", e);
         }
 
-        contentPanel.add(createTablePanel(model, 420));
-
         refreshContent();
+    }
+
+    private DefaultTableModel createVisitManagementTableModel(List<com.mycompany.perpustakaan.api.VisitSummary> visits) {
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[] { "ID", "Nama Pengunjung", "Jenis", "Asal Instansi", "Keperluan", "Status", "Tanggal" },
+                0);
+        if (visits == null || visits.isEmpty()) {
+            model.addRow(new Object[] { "-", "Belum ada data", "-", "-", "-", "-", "-" });
+            return model;
+        }
+
+        for (com.mycompany.perpustakaan.api.VisitSummary visit : visits) {
+            model.addRow(new Object[] {
+                    visit.getIdKunjungan(),
+                    safeOrDash(visit.getNamaPengunjung()),
+                    safeOrDash(visit.getJenisPengunjung()),
+                    safeOrDash(visit.getAsalInstansi()),
+                    safeOrDash(visit.getKeperluan()),
+                    safeOrDash(visit.getStatusKunjungan()),
+                    safeOrDash(visit.getTanggalKunjungan())
+            });
+        }
+        return model;
+    }
+
+    private JPanel createVisitManagementActions(JTable table) {
+        JPanel footer = createToolbarPanel();
+        JButton detail = createNeutralButton("Detail");
+        JButton finish = createActionButton("Selesaikan");
+        JButton cancel = createDangerButton("Batalkan");
+
+        detail.addActionListener(e -> showSelectedVisitDetail(table));
+        finish.addActionListener(e -> updateSelectedVisitStatus(table, true));
+        cancel.addActionListener(e -> updateSelectedVisitStatus(table, false));
+
+        footer.add(detail);
+        footer.add(finish);
+        footer.add(cancel);
+        return footer;
+    }
+
+    private void showSelectedVisitDetail(JTable table) {
+        Integer id = selectedId(table);
+        if (id == null) {
+            return;
+        }
+        try {
+            com.mycompany.perpustakaan.api.VisitSummary visit = libraryApi.getVisitById(id);
+            if (visit == null) {
+                JOptionPane.showMessageDialog(this, "Data kunjungan tidak ditemukan.", "Kunjungan", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            String message = "Nama: " + safeOrDash(visit.getNamaPengunjung())
+                    + "\nJenis: " + safeOrDash(visit.getJenisPengunjung())
+                    + "\nAsal: " + safeOrDash(visit.getAsalInstansi())
+                    + "\nKeperluan: " + safeOrDash(visit.getKeperluan())
+                    + "\nStatus: " + safeOrDash(visit.getStatusKunjungan())
+                    + "\nTanggal: " + safeOrDash(visit.getTanggalKunjungan());
+            JOptionPane.showMessageDialog(this, message, "Detail Kunjungan", JOptionPane.INFORMATION_MESSAGE);
+        } catch (SQLException e) {
+            showError("Gagal mengambil detail kunjungan", e);
+        }
+    }
+
+    private void updateSelectedVisitStatus(JTable table, boolean finish) {
+        Integer id = selectedId(table);
+        if (id == null) {
+            return;
+        }
+
+        String actionText = finish ? "selesaikan" : "batalkan";
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Yakin ingin " + actionText + " kunjungan ID " + id + "?",
+                "Konfirmasi",
+                JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try {
+            com.mycompany.perpustakaan.api.VisitResponse response = finish
+                    ? libraryApi.finishVisit(id)
+                    : libraryApi.cancelVisit(id);
+            showResponse(response.isSuccess(), response.getMessage());
+            if (response.isSuccess()) {
+                showVisitManagement();
+            }
+        } catch (SQLException e) {
+            showError("Gagal mengubah status kunjungan", e);
+        }
     }
 
     private void showAddBookDialog() {
