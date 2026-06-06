@@ -166,6 +166,7 @@ public class Dashboard extends JFrame {
             }
 
             if (isStaffOrAdmin()) {
+                addMenuButton("Pending Request", "/Homework.svg", e -> showPendingLoanRequests());
                 addMenuButton("Manajemen Buku", "/icon-bookshelf.png", e -> showBookManagement());
                 addMenuButton("Loans & Returns", "/icon-loan.png", e -> showLoanManagement());
                 addMenuButton("Members", "/icon-member.svg", e -> showMemberManagement());
@@ -627,6 +628,91 @@ public class Dashboard extends JFrame {
             showError("Gagal memuat member management", e);
         }
         refreshContent();
+    }
+
+    private void showPendingLoanRequests() {
+        if (!requireStaffOrAdminView()) {
+            return;
+        }
+        resetContent();
+        addTitle("Pending Loan Requests");
+        addQuickActions(new String[]{"Refresh"}, new Runnable[]{this::showPendingLoanRequests});
+        try {
+            List<com.mycompany.perpustakaan.api.LoanSummary> pendingLoans = libraryApi.getPendingLoanRequests();
+            DefaultTableModel model = new DefaultTableModel(
+                new Object[]{"ID", "Peminjam", "Username", "Buku", "Tanggal Request", "Jatuh Tempo", "Status"}, 0
+            );
+            for (com.mycompany.perpustakaan.api.LoanSummary loan : pendingLoans) {
+                String namaPeminjam = loan.getNamaUser();
+                if (namaPeminjam == null || namaPeminjam.isBlank()) {
+                    namaPeminjam = "-";
+                }
+                String username = loan.getUsernameUser();
+                if (username == null || username.isBlank()) {
+                    username = "-";
+                }
+                model.addRow(new Object[]{
+                    loan.getIdPeminjaman(),
+                    namaPeminjam,
+                    username,
+                    loan.getJudulBuku(),
+                    loan.getTanggalPinjam(),
+                    loan.getTanggalJatuhTempo(),
+                    loan.getStatus()
+                });
+            }
+            JTable table = createTable(model);
+            contentPanel.add(wrapTable(table, 480));
+
+            JPanel actions = createToolbarPanel();
+            JButton approve = createActionButton("Setujui");
+            approve.setBackground(GREEN_STATUS);
+            JButton reject = createActionButton("Tolak");
+            reject.setBackground(RED_STATUS);
+            actions.add(approve);
+            actions.add(reject);
+            contentPanel.add(actions);
+
+            approve.addActionListener(e -> approveSelectedPendingLoan(table));
+            reject.addActionListener(e -> rejectSelectedPendingLoan(table));
+        } catch (SQLException e) {
+            showError("Gagal memuat pending loan requests", e);
+        }
+        refreshContent();
+    }
+
+    private void approveSelectedPendingLoan(JTable table) {
+        Integer id = selectedId(table);
+        if (id == null) {
+            return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(this, "Setujui peminjaman ID " + id + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        if (confirm == JOptionPane.YES_OPTION) {
+            try {
+                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.approveLoanRequest(id);
+                showResponse(response.isSuccess(), response.getMessage());
+                showPendingLoanRequests();
+            } catch (SQLException e) {
+                showError("Gagal menyetujui peminjaman", e);
+            }
+        }
+    }
+
+    private void rejectSelectedPendingLoan(JTable table) {
+        Integer id = selectedId(table);
+        if (id == null) {
+            return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(this, "Tolak peminjaman ID " + id + "?", "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        if (confirm == JOptionPane.YES_OPTION) {
+            try {
+                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.rejectLoanRequest(id);
+                showResponse(response.isSuccess(), response.getMessage());
+                showPendingLoanRequests();
+            } catch (SQLException e) {
+                showError("Gagal menolak peminjaman", e);
+            }
+        }
     }
 
     private void showRequestLoan() {
