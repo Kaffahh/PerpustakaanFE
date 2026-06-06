@@ -118,7 +118,7 @@ public class LoginForm extends JFrame {
             ImageIcon icon = loadScaledIcon("/assets/branding/library-logo.png", LOGO_SIZE.width, LOGO_SIZE.height);
             logo.setIcon(icon);
         } catch (Exception e) {
-            logo.setText("📚 LIBRARY HUB");
+            logo.setText("LIBRARY HUB");
             logo.setFont(new Font("Segoe UI", Font.BOLD, 16));
             logo.setForeground(new Color(139, 90, 43));
         }
