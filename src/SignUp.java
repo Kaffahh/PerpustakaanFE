@@ -1,3 +1,4 @@
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -20,6 +21,7 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
+import javax.swing.JProgressBar;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.UIManager;
@@ -44,9 +46,11 @@ public class SignUp extends JFrame {
     private static final Color TEXT_DARK = new Color(50, 50, 50);
     private static final Color TEXT_GRAY = new Color(120, 120, 120);
     private static final Color PLACEHOLDER = new Color(165, 165, 165);
+    private static final Color GREEN_STATUS = new Color(0, 200, 83);
+    private static final Color RED_STATUS = new Color(255, 23, 68);
 
     private static final Dimension FRAME_SIZE = new Dimension(980, 620);
-    private static final Dimension CARD_SIZE = new Dimension(420, 500);
+    private static final Dimension CARD_SIZE = new Dimension(420, 540);
     private static final Dimension FIELD_SIZE = new Dimension(320, 42);
     private static final Dimension BUTTON_SIZE = new Dimension(320, 44);
 
@@ -197,68 +201,127 @@ public class SignUp extends JFrame {
         gbc.fill = GridBagConstraints.NONE;
         gbc.anchor = GridBagConstraints.CENTER;
 
+        // Row 0: Title
         JLabel title = new JLabel("Daftar Akun");
         title.setFont(new Font("Segoe UI", Font.BOLD, 28));
         title.setForeground(TEXT_DARK);
         title.setHorizontalAlignment(SwingConstants.CENTER);
-
         gbc.gridy = 0;
         gbc.insets = new Insets(0, 0, 8, 0);
         card.add(title, gbc);
 
+        // Row 1: Subtitle
         JLabel subtitle = new JLabel("Buat akun untuk mengakses perpustakaan.");
         subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         subtitle.setForeground(TEXT_GRAY);
         subtitle.setHorizontalAlignment(SwingConstants.CENTER);
-
         gbc.gridy = 1;
         gbc.insets = new Insets(0, 0, 28, 0);
         card.add(subtitle, gbc);
 
+        // Row 2: Username label
         gbc.gridy = 2;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.insets = new Insets(0, 0, 8, 0);
         card.add(createLabel("Username"), gbc);
 
+        // Row 3: Username field
         usernameField = createStyledField(USERNAME_PLACEHOLDER);
-
         gbc.gridy = 3;
         gbc.anchor = GridBagConstraints.CENTER;
         gbc.insets = new Insets(0, 0, 14, 0);
         card.add(usernameField, gbc);
 
+        // Row 4: Password label
         gbc.gridy = 4;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.insets = new Insets(0, 0, 8, 0);
         card.add(createLabel("Password"), gbc);
 
+        // Row 5: Password field
         passwordField = createStyledPasswordField(PASSWORD_PLACEHOLDER);
-
         gbc.gridy = 5;
         gbc.anchor = GridBagConstraints.CENTER;
-        gbc.insets = new Insets(0, 0, 14, 0);
+        gbc.insets = new Insets(0, 0, 4, 0);
         card.add(passwordField, gbc);
 
+        // Row 6: Strength indicator
+        JProgressBar strengthBar = new JProgressBar(0, 100);
+        strengthBar.setPreferredSize(new Dimension(320, 6));
+        strengthBar.setMaximumSize(new Dimension(320, 6));
+        strengthBar.setMinimumSize(new Dimension(320, 6));
+        strengthBar.setValue(0);
+        strengthBar.setForeground(new Color(200, 200, 200));
+        strengthBar.setBackground(WHITE);
+        strengthBar.setBorderPainted(false);
+        strengthBar.setOpaque(true);
+
+        JLabel strengthLabel = new JLabel("Kekuatan password");
+        strengthLabel.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        strengthLabel.setForeground(TEXT_GRAY);
+
+        JPanel strengthPanel = new JPanel(new BorderLayout(8, 0));
+        strengthPanel.setOpaque(false);
+        strengthPanel.setPreferredSize(new Dimension(320, 20));
+        strengthPanel.setMaximumSize(new Dimension(320, 20));
+        strengthPanel.add(strengthBar, BorderLayout.CENTER);
+        strengthPanel.add(strengthLabel, BorderLayout.EAST);
+
         gbc.gridy = 6;
+        gbc.anchor = GridBagConstraints.CENTER;
+        gbc.insets = new Insets(0, 0, 14, 0);
+        card.add(strengthPanel, gbc);
+
+        passwordField.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                String pwd = new String(passwordField.getPassword());
+                if (pwd.equals(PASSWORD_PLACEHOLDER) || pwd.isEmpty()) {
+                    strengthBar.setValue(0);
+                    strengthBar.setForeground(new Color(200, 200, 200));
+                    strengthLabel.setText("Kekuatan password");
+                    return;
+                }
+                int score = calculatePasswordStrength(pwd);
+                strengthBar.setValue(score);
+                if (score < 30) {
+                    strengthBar.setForeground(RED_STATUS);
+                    strengthLabel.setText("Lemah");
+                } else if (score < 60) {
+                    strengthBar.setForeground(new Color(255, 183, 77));
+                    strengthLabel.setText("Sedang");
+                } else if (score < 85) {
+                    strengthBar.setForeground(new Color(139, 195, 74));
+                    strengthLabel.setText("Kuat");
+                } else {
+                    strengthBar.setForeground(GREEN_STATUS);
+                    strengthLabel.setText("Sangat Kuat");
+                }
+            }
+        });
+
+        // Row 7: Confirm password label
+        gbc.gridy = 7;
         gbc.anchor = GridBagConstraints.WEST;
         gbc.insets = new Insets(0, 0, 8, 0);
         card.add(createLabel("Konfirmasi Password"), gbc);
 
+        // Row 8: Confirm password field
         confirmPasswordField = createStyledPasswordField(CONFIRM_PLACEHOLDER);
         confirmPasswordField.addActionListener(this::registerActionPerformed);
-
-        gbc.gridy = 7;
+        gbc.gridy = 8;
         gbc.anchor = GridBagConstraints.CENTER;
-        gbc.insets = new Insets(0, 0, 24, 0);
+        gbc.insets = new Insets(0, 0, 16, 0);
         card.add(confirmPasswordField, gbc);
 
+        // Row 9: Register button
         JButton registerButton = createStyledButton("Daftar Sekarang");
         registerButton.addActionListener(this::registerActionPerformed);
-
-        gbc.gridy = 8;
-        gbc.insets = new Insets(0, 0, 20, 0);
+        gbc.gridy = 9;
+        gbc.insets = new Insets(0, 0, 12, 0);
         card.add(registerButton, gbc);
 
+        // Row 10: Footer
         JPanel footer = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 5, 0));
         footer.setOpaque(false);
 
@@ -291,11 +354,43 @@ public class SignUp extends JFrame {
         footer.add(textLabel);
         footer.add(linkLabel);
 
-        gbc.gridy = 9;
+        gbc.gridy = 10;
         gbc.insets = new Insets(0, 0, 0, 0);
         card.add(footer, gbc);
 
         return card;
+    }
+
+    private int calculatePasswordStrength(String password) {
+        int score = 0;
+        if (password == null || password.isEmpty()) return 0;
+        
+        // Length scoring
+        if (password.length() >= 8) score += 25;
+        else if (password.length() >= 6) score += 15;
+        else score += 5;
+        
+        // Contains uppercase
+        if (!password.equals(password.toLowerCase())) score += 15;
+        
+        // Contains lowercase
+        if (!password.equals(password.toUpperCase())) score += 10;
+        
+        // Contains digits
+        if (password.matches(".*\\d.*")) score += 20;
+        
+        // Contains special chars
+        if (password.matches(".*[!@#$%^&*(),.?\":{}|<>_].*")) score += 20;
+        
+        // Mix of character types
+        int types = 0;
+        if (password.matches(".*[a-z].*")) types++;
+        if (password.matches(".*[A-Z].*")) types++;
+        if (password.matches(".*\\d.*")) types++;
+        if (password.matches(".*[!@#$%^&*(),.?\":{}|<>_].*")) types++;
+        if (types >= 3) score += 10;
+        
+        return Math.min(100, score);
     }
 
     private JLabel createLabel(String text) {
