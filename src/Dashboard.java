@@ -33,6 +33,7 @@ import javax.swing.AbstractCellEditor;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JLayeredPane;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -4563,51 +4564,213 @@ public class Dashboard extends JFrame {
     }
 
     private JButton createNotificationButton() {
-        JButton button = new JButton();
-        try {
-            button.setIcon(new ImageIcon(getClass().getResource("/assets/icons/icon-notification.png")));
-        } catch (Exception e) {
-            button.setText("Notif");
-            button.setFont(new Font("Segoe UI", Font.BOLD, 12));
-            button.setForeground(ACCENT);
-        }
+        JButton button = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setColor(new Color(255, 248, 245));
+                g2d.fillOval(0, 0, getWidth(), getHeight());
+                g2d.setColor(CARD_BORDER);
+                g2d.setStroke(new BasicStroke(1.2f));
+                g2d.drawOval(0, 0, getWidth() - 1, getHeight() - 1);
+                g2d.setColor(ACCENT);
+                g2d.setFont(new Font("Segoe UI", Font.BOLD, 16));
+                String bell = "🔔";
+                g2d.drawString(bell, 14, 36);
+                g2d.dispose();
+            }
+        };
         button.setPreferredSize(new Dimension(52, 52));
         button.setFocusPainted(false);
         button.setContentAreaFilled(false);
         button.setOpaque(false);
         button.setBorderPainted(false);
-        button.setBorder(new EmptyBorder(0, 0, 0, 0));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        button.addActionListener(e -> showNotifications());
-        return button;
+
+        // Unread badge label
+        JLabel badge = new JLabel("0") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setColor(RED_STATUS);
+                g2d.fillOval(0, 0, getWidth() - 1, getHeight() - 1);
+                g2d.setColor(WHITE);
+                g2d.setFont(new Font("Segoe UI", Font.BOLD, 10));
+                java.awt.FontMetrics fm = g2d.getFontMetrics();
+                String text = getText();
+                int textX = (getWidth() - fm.stringWidth(text)) / 2;
+                int textY = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+                g2d.drawString(text, textX, textY);
+                g2d.dispose();
+            }
+        };
+        badge.setForeground(WHITE);
+        badge.setPreferredSize(new Dimension(20, 20));
+        badge.setVisible(false);
+
+        JLayeredPane layeredPane = new JLayeredPane();
+        layeredPane.setPreferredSize(new Dimension(52, 52));
+        button.setBounds(0, 0, 52, 52);
+        badge.setBounds(32, 2, 20, 20);
+        layeredPane.add(button, JLayeredPane.DEFAULT_LAYER);
+        layeredPane.add(badge, JLayeredPane.PALETTE_LAYER);
+
+        // Notification panel (hidden initially)
+        JPanel notifPanel = new RoundedPanel(22, WHITE, CARD_BORDER, 1f);
+        notifPanel.setLayout(new BoxLayout(notifPanel, BoxLayout.Y_AXIS));
+        notifPanel.setBorder(new EmptyBorder(12, 14, 12, 14));
+        notifPanel.setVisible(false);
+
+        JPanel notifWrapper = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        notifWrapper.setOpaque(false);
+        notifWrapper.add(notifPanel);
+
+        button.addActionListener(e -> {
+            if (notifPanel.isVisible()) {
+                notifPanel.setVisible(false);
+                notifWrapper.removeAll();
+                return;
+            }
+            loadNotifications(notifPanel, badge, layeredPane);
+            boolean wasVisible = notifPanel.isVisible();
+            notifPanel.setVisible(!wasVisible);
+            if (!wasVisible) {
+                notifWrapper.removeAll();
+                notifWrapper.add(notifPanel);
+            }
+        });
+
+        // Store references for later use
+        layeredPane.putClientProperty("notifPanel", notifPanel);
+        layeredPane.putClientProperty("notifBadge", badge);
+        layeredPane.putClientProperty("notifWrapper", notifWrapper);
+        layeredPane.putClientProperty("layeredPane", layeredPane);
+
+        return new JButton() {
+            {
+                setLayout(new BorderLayout());
+                add(layeredPane, BorderLayout.CENTER);
+                setOpaque(false);
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setFocusPainted(false);
+                setPreferredSize(new Dimension(52, 52));
+                setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+                addActionListener(e -> {
+                    JPanel np = (JPanel) layeredPane.getClientProperty("notifPanel");
+                    JLabel bdg = (JLabel) layeredPane.getClientProperty("notifBadge");
+                    loadNotifications(np, bdg, layeredPane);
+                    np.setVisible(!np.isVisible());
+                });
+            }
+        };
     }
 
-    private void showNotifications() {
+    private void loadNotifications(JPanel notifPanel, JLabel badge, JLayeredPane parent) {
         try {
             List<com.mycompany.perpustakaan.api.NotificationSummary> notifications = libraryApi.getNotifications(8);
-            StringBuilder message = new StringBuilder();
-            for (com.mycompany.perpustakaan.api.NotificationSummary notification : notifications) {
-                if (message.length() > 0) {
-                    message.append("\n\n");
+            notifPanel.removeAll();
+            
+            // Header
+            JPanel header = new JPanel(new BorderLayout());
+            header.setOpaque(false);
+            JLabel title = new JLabel("Notifikasi");
+            title.setFont(new Font("Segoe UI", Font.BOLD, 14));
+            title.setForeground(TEXT_DARK);
+            
+            JButton markRead = new JButton("✓ Baca Semua");
+            markRead.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+            markRead.setForeground(ACCENT);
+            markRead.setContentAreaFilled(false);
+            markRead.setBorderPainted(false);
+            markRead.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+            markRead.addActionListener(ev -> {
+                try {
+                    com.mycompany.perpustakaan.api.MemberResponse response = libraryApi.markAllNotificationsRead();
+                    showResponse(response.isSuccess(), response.getMessage());
+                    badge.setVisible(false);
+                    loadNotifications(notifPanel, badge, parent);
+                } catch (SQLException ex) {
+                    showError("Gagal tandai dibaca", ex);
                 }
-                message.append(notification.getJudul())
-                        .append("\n")
-                        .append(notification.getPesan());
+            });
+            
+            header.add(title, BorderLayout.WEST);
+            header.add(markRead, BorderLayout.EAST);
+            notifPanel.add(header);
+            notifPanel.add(Box.createVerticalStrut(10));
+
+            int unreadCount = 0;
+            for (com.mycompany.perpustakaan.api.NotificationSummary notif : notifications) {
+                if (!notif.isRead()) unreadCount++;
+                
+                JPanel item = new JPanel(new BorderLayout(8, 0));
+                item.setOpaque(true);
+                item.setBackground(notif.isRead() ? WHITE : new Color(255, 248, 245));
+                item.setBorder(new EmptyBorder(8, 8, 8, 8));
+                item.setMaximumSize(new Dimension(340, 60));
+                item.setPreferredSize(new Dimension(340, 60));
+                
+                // Unread indicator dot
+                JLabel dot = new JLabel(notif.isRead() ? "" : "●");
+                dot.setFont(new Font("Segoe UI", Font.BOLD, 14));
+                dot.setForeground(ACCENT);
+                dot.setPreferredSize(new Dimension(16, 16));
+                dot.setHorizontalAlignment(SwingConstants.CENTER);
+                
+                JPanel textPanel = new JPanel();
+                textPanel.setOpaque(false);
+                textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+                
+                JLabel notifTitle = new JLabel(notif.getJudul());
+                notifTitle.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                notifTitle.setForeground(TEXT_DARK);
+                
+                JLabel notifMsg = new JLabel(truncate(notif.getPesan(), 42));
+                notifMsg.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+                notifMsg.setForeground(TEXT_GRAY);
+                
+                JLabel notifTime = new JLabel(notif.getCreatedAt() == null ? "" : notif.getCreatedAt());
+                notifTime.setFont(new Font("Segoe UI", Font.PLAIN, 9));
+                notifTime.setForeground(new Color(180, 180, 180));
+                
+                textPanel.add(notifTitle);
+                textPanel.add(Box.createVerticalStrut(2));
+                textPanel.add(notifMsg);
+                textPanel.add(Box.createVerticalStrut(2));
+                textPanel.add(notifTime);
+                
+                item.add(dot, BorderLayout.WEST);
+                item.add(textPanel, BorderLayout.CENTER);
+                
+                notifPanel.add(item);
+                notifPanel.add(Box.createVerticalStrut(4));
             }
-            Object[] options = { "Tutup", "Tandai Dibaca" };
-            int choice = JOptionPane.showOptionDialog(
-                    this,
-                    message.toString(),
-                    "Notifikasi",
-                    JOptionPane.DEFAULT_OPTION,
-                    JOptionPane.INFORMATION_MESSAGE,
-                    null,
-                    options,
-                    options[0]);
-            if (choice == 1) {
-                com.mycompany.perpustakaan.api.MemberResponse response = libraryApi.markAllNotificationsRead();
-                showResponse(response.isSuccess(), response.getMessage());
+            
+            if (notifications.isEmpty()) {
+                JLabel empty = new JLabel("Tidak ada notifikasi");
+                empty.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                empty.setForeground(TEXT_GRAY);
+                empty.setAlignmentX(Component.CENTER_ALIGNMENT);
+                notifPanel.add(empty);
             }
+            
+            // Update badge
+            badge.setText(String.valueOf(unreadCount));
+            badge.setVisible(unreadCount > 0);
+            
+            // Resize panel
+            int panelH = Math.min(notifications.size() * 70 + 50, 420);
+            notifPanel.setPreferredSize(new Dimension(360, panelH));
+            notifPanel.setMaximumSize(new Dimension(360, panelH));
+            notifPanel.revalidate();
+            notifPanel.repaint();
+            
+            parent.revalidate();
+            parent.repaint();
+            
         } catch (SQLException | IllegalStateException e) {
             showError("Gagal memuat notifikasi", e);
         }
