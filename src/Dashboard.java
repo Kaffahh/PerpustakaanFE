@@ -172,7 +172,9 @@ public class Dashboard extends JFrame {
                 addMenuButton("Report", "/assets/icons/icon-admin-report.svg", e -> showAdminDashboard());
                 addMenuButton("Inventory", "/assets/icons/icon-book.svg", e -> showInventoryReport());
                 addMenuButton("Loan Report", "/assets/icons/icon-loan-report.svg", e -> showLoanReport());
+                addMenuButton("Visit Report", "/assets/icons/icon-visit.svg", e -> showVisitReport());
                 addMenuButton("Buku Populer", "/assets/icons/icon-history.png", e -> showPopularBookReport());
+                addMenuButton("Kategori", "/assets/icons/icon-book.svg", e -> showCategoryManagement());
                 addMenuButton("Tambah Buku", "/assets/icons/icon-loan.png", e -> showAddBookDialog());
             }
 
@@ -180,6 +182,7 @@ public class Dashboard extends JFrame {
                 addMenuButton("Pending Request", "/assets/icons/icon-loan-report.svg", e -> showPendingLoanRequests());
                 addMenuButton("Manajemen Buku", "/assets/icons/icon-bookshelf.png", e -> showBookManagement());
                 addMenuButton("Loans & Returns", "/assets/icons/icon-loan.png", e -> showLoanManagement());
+                addMenuButton("Denda", "/assets/icons/icon-admin-report.svg", e -> showFineManagement());
                 addMenuButton("Members", "/assets/icons/icon-member.svg", e -> showMemberManagement());
                 addMenuButton("Kunjungan", "/assets/icons/icon-visit.svg", e -> showVisitManagement());
             } else {
@@ -826,7 +829,69 @@ public class Dashboard extends JFrame {
         refreshContent();
     }
 
-    private void showBookManagement() {
+    private void showVisitReport() {
+        if (!requireAdminView()) {
+            return;
+        }
+        resetContent();
+        addTitle("Laporan Kunjungan");
+
+        JTextField search = createModernSearchField("Cari pengunjung / asal / keperluan...");
+        JComboBox<String> status = new JComboBox<>(new String[] { "semua", "datang", "selesai", "batal" });
+        status.setPreferredSize(new Dimension(150, 38));
+        status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JButton load = createActionButton("Tampilkan");
+
+        JPanel toolbar = createToolbarPanel();
+        toolbar.add(search);
+        toolbar.add(new JLabel("Status"));
+        toolbar.add(status);
+        toolbar.add(load);
+        contentPanel.add(toolbar);
+        contentPanel.add(Box.createVerticalStrut(15));
+
+        JPanel tableHolder = createDynamicContentPanel();
+        contentPanel.add(tableHolder);
+
+        final Runnable[] render = new Runnable[1];
+        render[0] = () -> {
+            tableHolder.removeAll();
+            try {
+                String keyword = searchText(search, "Cari pengunjung / asal / keperluan...");
+                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                DefaultTableModel model = new DefaultTableModel(
+                        new Object[] { "ID", "Nama", "Jenis", "Asal", "Keperluan", "Status", "Tanggal" }, 0);
+                List<com.mycompany.perpustakaan.api.VisitReportRow> rows = libraryApi.getVisitReport(keyword, selectedStatus);
+                if (rows.isEmpty()) {
+                    model.addRow(new Object[] { "-", "Belum ada data", "-", "-", "-", "-", "-" });
+                } else {
+                    for (com.mycompany.perpustakaan.api.VisitReportRow row : rows) {
+                        model.addRow(new Object[] {
+                                row.getIdKunjungan(),
+                                safeOrDash(row.getNamaPengunjung()),
+                                safeOrDash(row.getJenisPengunjung()),
+                                safeOrDash(row.getAsalInstansi()),
+                                safeOrDash(row.getKeperluan()),
+                                safeOrDash(row.getStatusKunjungan()),
+                                safeOrDash(row.getTanggalKunjungan())
+                        });
+                    }
+                }
+                tableHolder.add(createTablePanel(model, 520));
+                refreshContent();
+            } catch (SQLException e) {
+                showError("Gagal memuat laporan kunjungan", e);
+            }
+        };
+
+        load.addActionListener(e -> render[0].run());
+        search.addActionListener(e -> render[0].run());
+        status.addActionListener(e -> render[0].run());
+        render[0].run();
+        refreshContent();
+    }
+
+private void showBookManagement() {
         if (!requireStaffOrAdminView()) {
             return;
         }
@@ -1136,7 +1201,7 @@ public class Dashboard extends JFrame {
         return actions;
     }
 
-    private JButton createDangerButton(String text) {
+private JButton createDangerButton(String text) {
         JButton button = new GradientActionButton(text);
         button.setFont(new Font("Segoe UI", Font.BOLD, 12));
         button.setForeground(WHITE);
@@ -1147,8 +1212,101 @@ public class Dashboard extends JFrame {
         button.setOpaque(false);
         button.setBorder(new EmptyBorder(10, 17, 10, 17));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        return button;
+    return button;
+}
+
+private void showCategoryManagement() {
+    if (!requireAdminView()) {
+        return;
     }
+    resetContent();
+    addTitle("Manajemen Kategori");
+
+    addDashboardHero(
+            "Kelola Kategori Buku",
+            "Pantau jumlah buku per kategori, ubah nama kategori, atau lepas kategori dari buku.");
+
+    try {
+        JTable table = createTable(createCategoryTableModel(libraryApi.getCategorySummaries()));
+        contentPanel.add(wrapTable(table, 460));
+
+        JPanel actions = createToolbarPanel();
+        JButton rename = createActionButton("Rename");
+        JButton clear = createDangerButton("Lepas Kategori");
+        JButton refresh = createNeutralButton("Refresh");
+        rename.addActionListener(e -> renameSelectedCategory(table));
+        clear.addActionListener(e -> clearSelectedCategory(table));
+        refresh.addActionListener(e -> showCategoryManagement());
+        actions.add(rename);
+        actions.add(clear);
+        actions.add(refresh);
+        contentPanel.add(actions);
+    } catch (SQLException e) {
+        showError("Gagal memuat kategori", e);
+    }
+    refreshContent();
+}
+
+private DefaultTableModel createCategoryTableModel(List<com.mycompany.perpustakaan.api.CategorySummary> categories) {
+    DefaultTableModel model = new DefaultTableModel(
+            new Object[] { "Kategori", "Total Buku", "Stok Tersedia", "Stok Total" }, 0);
+    if (categories == null || categories.isEmpty()) {
+        model.addRow(new Object[] { "Belum ada kategori", "-", "-", "-" });
+        return model;
+    }
+    for (com.mycompany.perpustakaan.api.CategorySummary category : categories) {
+        model.addRow(new Object[] {
+                category.getNamaKategori(),
+                category.getTotalBuku(),
+                category.getStokTersedia(),
+                category.getStokTotal()
+        });
+    }
+    return model;
+}
+
+private void renameSelectedCategory(JTable table) {
+    String category = selectedString(table, 0);
+    if (category == null || "Belum ada kategori".equals(category)) {
+        return;
+    }
+    JTextField newName = createField(category);
+    int result = JOptionPane.showConfirmDialog(this, newName, "Nama kategori baru",
+            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+    if (result != JOptionPane.OK_OPTION) {
+        return;
+    }
+    try {
+        com.mycompany.perpustakaan.api.BookResponse response = libraryApi.renameCategory(category, newName.getText());
+        showResponse(response.isSuccess(), response.getMessage());
+        if (response.isSuccess()) {
+            showCategoryManagement();
+        }
+    } catch (SQLException e) {
+        showError("Gagal rename kategori", e);
+    }
+}
+
+private void clearSelectedCategory(JTable table) {
+    String category = selectedString(table, 0);
+    if (category == null || "Belum ada kategori".equals(category)) {
+        return;
+    }
+    int confirm = JOptionPane.showConfirmDialog(this, "Lepas kategori " + category + " dari semua buku?",
+            "Konfirmasi", JOptionPane.YES_NO_OPTION);
+    if (confirm != JOptionPane.YES_OPTION) {
+        return;
+    }
+    try {
+        com.mycompany.perpustakaan.api.BookResponse response = libraryApi.clearCategory(category);
+        showResponse(response.isSuccess(), response.getMessage());
+        if (response.isSuccess()) {
+            showCategoryManagement();
+        }
+    } catch (SQLException e) {
+        showError("Gagal melepas kategori", e);
+    }
+}
 
     private void showLoanManagement() {
         if (!requireStaffOrAdminView()) {
@@ -1158,10 +1316,12 @@ public class Dashboard extends JFrame {
         addTitle("Loans & Returns");
         JPanel actions = createToolbarPanel();
         JButton create = createActionButton("Buat Peminjaman");
+        JTextField search = createModernSearchField("Cari user / buku / kode...");
         JComboBox<String> status = new JComboBox<>(
                 new String[] { "semua", "aktif", "dipinjam", "terlambat", "dikembalikan" });
         JButton load = createActionButton("Tampilkan");
         actions.add(create);
+        actions.add(search);
         actions.add(new JLabel("Status"));
         actions.add(status);
         actions.add(load);
@@ -1170,12 +1330,16 @@ public class Dashboard extends JFrame {
 
         JPanel tableHolder = createDynamicContentPanel();
         contentPanel.add(tableHolder);
+        final int[] currentPage = {1};
+        final int pageSize = 50;
 
-        Runnable render = () -> {
+        final Runnable[] render = new Runnable[1];
+        render[0] = () -> {
             tableHolder.removeAll();
             try {
+                String keyword = searchText(search, "Cari user / buku / kode...");
                 com.mycompany.perpustakaan.api.LoanManagementPage page = libraryApi
-                        .getLoansForManagement((String) status.getSelectedItem(), 1, 50);
+                        .searchLoansForManagement((String) status.getSelectedItem(), keyword, currentPage[0], pageSize);
                 DefaultTableModel model = new DefaultTableModel(
                         new Object[] { "ID", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda" }, 0);
                 for (com.mycompany.perpustakaan.api.LoanSummary loan : page.getLoans()) {
@@ -1196,7 +1360,27 @@ public class Dashboard extends JFrame {
                 JButton returnButton = createActionButton("Proses Pengembalian Terpilih");
                 returnButton.addActionListener(e -> processSelectedReturn(table));
                 JPanel footer = createToolbarPanel();
+                JButton prev = createNeutralButton("Prev");
+                JButton next = createNeutralButton("Next");
+                JLabel pageInfo = new JLabel("Halaman " + page.getPage() + " / " + Math.max(1, page.getTotalPages())
+                        + " - Total " + page.getTotalItems() + " data");
+                pageInfo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                pageInfo.setForeground(TEXT_GRAY);
+                prev.setEnabled(page.hasPreviousPage());
+                next.setEnabled(page.hasNextPage());
+                prev.addActionListener(e -> {
+                    currentPage[0] = Math.max(1, currentPage[0] - 1);
+                    render[0].run();
+                });
+                next.addActionListener(e -> {
+                    currentPage[0]++;
+                    render[0].run();
+                });
                 footer.add(returnButton);
+                footer.add(Box.createHorizontalStrut(16));
+                footer.add(prev);
+                footer.add(next);
+                footer.add(pageInfo);
                 panel.add(footer);
                 tableHolder.add(panel);
                 refreshContent();
@@ -1205,8 +1389,175 @@ public class Dashboard extends JFrame {
             }
         };
         create.addActionListener(e -> showCreateLoanDialog());
-        load.addActionListener(e -> render.run());
-        render.run();
+        load.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        search.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        status.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        render[0].run();
+    }
+
+    private void showFineManagement() {
+        if (!requireStaffOrAdminView()) {
+            return;
+        }
+        resetContent();
+        addTitle("Manajemen Denda");
+
+        JTextField search = createModernSearchField("Cari user / buku...");
+        JComboBox<String> status = new JComboBox<>(new String[] { "semua", "unpaid", "paid", "waived" });
+        status.setPreferredSize(new Dimension(150, 38));
+        status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JButton load = createActionButton("Tampilkan");
+
+        JPanel toolbar = createToolbarPanel();
+        toolbar.add(search);
+        toolbar.add(new JLabel("Status"));
+        toolbar.add(status);
+        toolbar.add(load);
+        contentPanel.add(toolbar);
+        contentPanel.add(Box.createVerticalStrut(15));
+
+        JPanel tableHolder = createDynamicContentPanel();
+        JPanel actionHolder = createDynamicContentPanel();
+        contentPanel.add(tableHolder);
+        contentPanel.add(actionHolder);
+        final int[] currentPage = {1};
+        final int pageSize = 50;
+
+        final Runnable[] render = new Runnable[1];
+        render[0] = () -> {
+            tableHolder.removeAll();
+            actionHolder.removeAll();
+            try {
+                String keyword = searchText(search, "Cari user / buku...");
+                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                int totalItems = libraryApi.countFines(keyword, selectedStatus);
+                int totalPages = calculateTotalPages(totalItems, pageSize);
+                if (totalPages > 0 && currentPage[0] > totalPages) {
+                    currentPage[0] = totalPages;
+                }
+                List<com.mycompany.perpustakaan.api.FineSummary> fines = libraryApi.getFines(keyword, selectedStatus, currentPage[0], pageSize);
+                JTable table = createTable(createFineTableModel(fines));
+                tableHolder.add(wrapTable(table, 500));
+
+                JPanel actions = createToolbarPanel();
+                JButton paid = createActionButton("Tandai Lunas");
+                paid.addActionListener(e -> markSelectedFinePaid(table));
+                actions.add(paid);
+                if (isAdmin()) {
+                    JButton waive = createDangerButton("Waive");
+                    waive.addActionListener(e -> waiveSelectedFine(table));
+                    actions.add(waive);
+                }
+                JButton prev = createNeutralButton("Prev");
+                JButton next = createNeutralButton("Next");
+                JLabel pageInfo = new JLabel("Halaman " + currentPage[0] + " / " + Math.max(1, totalPages)
+                        + " - Total " + totalItems + " data");
+                pageInfo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                pageInfo.setForeground(TEXT_GRAY);
+                prev.setEnabled(currentPage[0] > 1);
+                next.setEnabled(totalPages > 0 && currentPage[0] < totalPages);
+                prev.addActionListener(e -> {
+                    currentPage[0] = Math.max(1, currentPage[0] - 1);
+                    render[0].run();
+                });
+                next.addActionListener(e -> {
+                    currentPage[0]++;
+                    render[0].run();
+                });
+                actions.add(Box.createHorizontalStrut(16));
+                actions.add(prev);
+                actions.add(next);
+                actions.add(pageInfo);
+                actionHolder.add(actions);
+                refreshContent();
+            } catch (SQLException e) {
+                showError("Gagal memuat denda", e);
+            }
+        };
+
+        load.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        search.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        status.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        render[0].run();
+        refreshContent();
+    }
+
+    private DefaultTableModel createFineTableModel(List<com.mycompany.perpustakaan.api.FineSummary> fines) {
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[] { "ID Peminjaman", "User", "Username", "Buku", "Jatuh Tempo", "Kembali", "Denda", "Status" },
+                0);
+        if (fines == null || fines.isEmpty()) {
+            model.addRow(new Object[] { "-", "Belum ada denda", "-", "-", "-", "-", "-", "-" });
+            return model;
+        }
+        for (com.mycompany.perpustakaan.api.FineSummary fine : fines) {
+            model.addRow(new Object[] {
+                    fine.getIdPeminjaman(),
+                    safeOrDash(fine.getNamaUser()),
+                    safeOrDash(fine.getUsername()),
+                    safeOrDash(fine.getJudulBuku()),
+                    fine.getTanggalJatuhTempo(),
+                    fine.getTanggalKembali(),
+                    formatMoney(fine.getNominalDenda()),
+                    safeOrDash(fine.getStatusPembayaran())
+            });
+        }
+        return model;
+    }
+
+    private void markSelectedFinePaid(JTable table) {
+        Integer id = selectedId(table);
+        if (id == null) {
+            return;
+        }
+        try {
+            com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.markFinePaid(id);
+            showResponse(response.isSuccess(), response.getMessage());
+            if (response.isSuccess()) {
+                showFineManagement();
+            }
+        } catch (SQLException e) {
+            showError("Gagal memproses pembayaran denda", e);
+        }
+    }
+
+    private void waiveSelectedFine(JTable table) {
+        Integer id = selectedId(table);
+        if (id == null) {
+            return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(this, "Waive denda peminjaman ID " + id + "?",
+                "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.waiveFine(id);
+            showResponse(response.isSuccess(), response.getMessage());
+            if (response.isSuccess()) {
+                showFineManagement();
+            }
+        } catch (SQLException e) {
+            showError("Gagal waive denda", e);
+        }
     }
 
     private void showMemberManagement() {
@@ -1926,28 +2277,91 @@ public class Dashboard extends JFrame {
                 "Pantau dan catat kunjungan pengunjung perpustakaan dari satu halaman.");
 
         JPanel actions = createToolbarPanel();
-
+        JTextField search = createModernSearchField("Cari pengunjung / asal / keperluan...");
+        JComboBox<String> status = new JComboBox<>(new String[] { "semua", "datang", "selesai", "batal" });
+        status.setPreferredSize(new Dimension(150, 38));
+        status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JButton load = createActionButton("Tampilkan");
         JButton tambahKunjungan = createActionButton("Tambah Kunjungan");
         JButton refresh = createNeutralButton("Refresh");
 
         tambahKunjungan.addActionListener(e -> showVisitForm());
         refresh.addActionListener(e -> showVisitManagement());
 
+        actions.add(search);
+        actions.add(new JLabel("Status"));
+        actions.add(status);
+        actions.add(load);
         actions.add(tambahKunjungan);
         actions.add(refresh);
 
         contentPanel.add(actions);
         contentPanel.add(Box.createVerticalStrut(16));
 
-        try {
-            List<com.mycompany.perpustakaan.api.VisitSummary> visits = libraryApi.getRecentVisits(100);
-            JTable table = createTable(createVisitManagementTableModel(visits));
-            contentPanel.add(wrapTable(table, 420));
-            contentPanel.add(Box.createVerticalStrut(10));
-            contentPanel.add(createVisitManagementActions(table));
-        } catch (SQLException e) {
-            showError("Gagal memuat data kunjungan", e);
-        }
+        JPanel tableHolder = createDynamicContentPanel();
+        JPanel actionHolder = createDynamicContentPanel();
+        contentPanel.add(tableHolder);
+        contentPanel.add(Box.createVerticalStrut(10));
+        contentPanel.add(actionHolder);
+        final int[] currentPage = {1};
+        final int pageSize = 50;
+
+        final Runnable[] render = new Runnable[1];
+        render[0] = () -> {
+            tableHolder.removeAll();
+            actionHolder.removeAll();
+            try {
+                String keyword = searchText(search, "Cari pengunjung / asal / keperluan...");
+                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                int totalItems = libraryApi.countVisits(keyword, selectedStatus);
+                int totalPages = calculateTotalPages(totalItems, pageSize);
+                if (totalPages > 0 && currentPage[0] > totalPages) {
+                    currentPage[0] = totalPages;
+                }
+                List<com.mycompany.perpustakaan.api.VisitSummary> visits = libraryApi.searchVisits(keyword, selectedStatus, currentPage[0], pageSize);
+                JTable table = createTable(createVisitManagementTableModel(visits));
+                tableHolder.add(wrapTable(table, 420));
+                JPanel visitActions = createVisitManagementActions(table);
+                JButton prev = createNeutralButton("Prev");
+                JButton next = createNeutralButton("Next");
+                JLabel pageInfo = new JLabel("Halaman " + currentPage[0] + " / " + Math.max(1, totalPages)
+                        + " - Total " + totalItems + " data");
+                pageInfo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                pageInfo.setForeground(TEXT_GRAY);
+                prev.setEnabled(currentPage[0] > 1);
+                next.setEnabled(totalPages > 0 && currentPage[0] < totalPages);
+                prev.addActionListener(e -> {
+                    currentPage[0] = Math.max(1, currentPage[0] - 1);
+                    render[0].run();
+                });
+                next.addActionListener(e -> {
+                    currentPage[0]++;
+                    render[0].run();
+                });
+                visitActions.add(Box.createHorizontalStrut(16));
+                visitActions.add(prev);
+                visitActions.add(next);
+                visitActions.add(pageInfo);
+                actionHolder.add(visitActions);
+                refreshContent();
+            } catch (SQLException e) {
+                showError("Gagal memuat data kunjungan", e);
+            }
+        };
+
+        load.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        search.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        status.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        render[0].run();
 
         refreshContent();
     }
@@ -3642,9 +4056,26 @@ public class Dashboard extends JFrame {
         button.setBorderPainted(false);
         button.setBorder(new EmptyBorder(0, 0, 0, 0));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-        button.addActionListener(e -> JOptionPane.showMessageDialog(this, "Belum ada notifikasi baru.", "Notifikasi",
-                JOptionPane.INFORMATION_MESSAGE));
+        button.addActionListener(e -> showNotifications());
         return button;
+    }
+
+    private void showNotifications() {
+        try {
+            List<com.mycompany.perpustakaan.api.NotificationSummary> notifications = libraryApi.getNotifications(8);
+            StringBuilder message = new StringBuilder();
+            for (com.mycompany.perpustakaan.api.NotificationSummary notification : notifications) {
+                if (message.length() > 0) {
+                    message.append("\n\n");
+                }
+                message.append(notification.getJudul())
+                        .append("\n")
+                        .append(notification.getPesan());
+            }
+            JOptionPane.showMessageDialog(this, message.toString(), "Notifikasi", JOptionPane.INFORMATION_MESSAGE);
+        } catch (SQLException | IllegalStateException e) {
+            showError("Gagal memuat notifikasi", e);
+        }
     }
 
     private JButton createLogoutButton() {
@@ -4660,6 +5091,20 @@ public class Dashboard extends JFrame {
         }
     }
 
+    private String selectedString(JTable table, int column) {
+        int selected = table.getSelectedRow();
+        if (selected < 0) {
+            JOptionPane.showMessageDialog(this, "Pilih baris dulu.", "Info", JOptionPane.INFORMATION_MESSAGE);
+            return null;
+        }
+        Object value = table.getValueAt(selected, column);
+        if (value == null || String.valueOf(value).trim().isEmpty() || "-".equals(String.valueOf(value))) {
+            JOptionPane.showMessageDialog(this, "Data ini bukan baris yang bisa diproses.", "Info", JOptionPane.INFORMATION_MESSAGE);
+            return null;
+        }
+        return String.valueOf(value).trim();
+    }
+
     private String chooseDirectory() {
         JFileChooser chooser = new JFileChooser(new File(System.getProperty("user.home"), "Documents"));
         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
@@ -4672,6 +5117,13 @@ public class Dashboard extends JFrame {
 
     private LocalDate parseDate(String value) {
         return LocalDate.parse(value.trim());
+    }
+
+    private int calculateTotalPages(int totalItems, int pageSize) {
+        if (totalItems <= 0 || pageSize <= 0) {
+            return 0;
+        }
+        return (int) Math.ceil((double) totalItems / pageSize);
     }
 
     private String truncate(String text, int maxLength) {
