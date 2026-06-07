@@ -1581,12 +1581,16 @@ public class Dashboard extends JFrame {
         status.setPreferredSize(new Dimension(150, 38));
         status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         JButton load = createActionButton("Tampilkan");
+        JButton pdf = createActionButton("Export PDF");
+        JButton xlsx = createActionButton("Export XLSX");
 
         JPanel toolbar = createToolbarPanel();
         toolbar.add(search);
         toolbar.add(new JLabel("Status"));
         toolbar.add(status);
         toolbar.add(load);
+        toolbar.add(pdf);
+        toolbar.add(xlsx);
         contentPanel.add(toolbar);
         contentPanel.add(Box.createVerticalStrut(15));
 
@@ -1663,6 +1667,14 @@ public class Dashboard extends JFrame {
             currentPage[0] = 1;
             render[0].run();
         });
+        pdf.addActionListener(e -> exportFine(
+                "pdf",
+                searchText(search, "Cari user / buku..."),
+                status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString()));
+        xlsx.addActionListener(e -> exportFine(
+                "xlsx",
+                searchText(search, "Cari user / buku..."),
+                status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString()));
         render[0].run();
         refreshContent();
     }
@@ -1778,16 +1790,28 @@ public class Dashboard extends JFrame {
                     JButton update = createActionButton("Update");
                     JButton suspend = createActionButton("Suspend");
                     JButton activate = createActionButton("Aktifkan");
+                    JButton exportPdf = createActionButton("Export PDF");
+                    JButton exportXlsx = createActionButton("Export XLSX");
                     JButton delete = createDangerButton("Hapus");
 
                     update.addActionListener(e -> updateSelectedMember(table));
                     suspend.addActionListener(e -> changeSelectedMemberStatus(table, true));
                     activate.addActionListener(e -> changeSelectedMemberStatus(table, false));
+                    exportPdf.addActionListener(e -> exportMember(
+                            "pdf",
+                            searchText(search, "Cari nama / username / email..."),
+                            status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString()));
+                    exportXlsx.addActionListener(e -> exportMember(
+                            "xlsx",
+                            searchText(search, "Cari nama / username / email..."),
+                            status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString()));
                     delete.addActionListener(e -> deleteSelectedMember(table));
 
                     actions.add(update);
                     actions.add(suspend);
                     actions.add(activate);
+                    actions.add(exportPdf);
+                    actions.add(exportXlsx);
                     actions.add(delete);
 
                 } else {
@@ -3814,6 +3838,36 @@ public class Dashboard extends JFrame {
                     response.getMessage() + (response.getFilePath() == null ? "" : "\n" + response.getFilePath()));
         } catch (SQLException | DateTimeParseException e) {
             showError("Gagal export peminjaman", e);
+        }
+    }
+
+    private void exportFine(String format, String keyword, String status) {
+        String dir = chooseDirectory();
+        if (dir == null) {
+            return;
+        }
+        try {
+            com.mycompany.perpustakaan.api.ReportExportResponse response =
+                    libraryApi.exportFineReport(format, dir, keyword, status);
+            showResponse(response.isSuccess(),
+                    response.getMessage() + (response.getFilePath() == null ? "" : "\n" + response.getFilePath()));
+        } catch (SQLException e) {
+            showError("Gagal export denda", e);
+        }
+    }
+
+    private void exportMember(String format, String keyword, String status) {
+        String dir = chooseDirectory();
+        if (dir == null) {
+            return;
+        }
+        try {
+            com.mycompany.perpustakaan.api.ReportExportResponse response =
+                    libraryApi.exportMemberReport(format, dir, keyword, status);
+            showResponse(response.isSuccess(),
+                    response.getMessage() + (response.getFilePath() == null ? "" : "\n" + response.getFilePath()));
+        } catch (SQLException e) {
+            showError("Gagal export member", e);
         }
     }
 
