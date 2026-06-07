@@ -530,21 +530,138 @@ public class LoginForm extends JFrame {
                 : new String(passwordField.getPassword());
 
         try {
-            com.mycompany.perpustakaan.api.AuthResponse response = libraryApi.login(username, password);
-            if (!response.isSuccess()) {
-                JOptionPane.showMessageDialog(this, response.getMessage(), "Login gagal", JOptionPane.ERROR_MESSAGE);
+            Object response = loginPersistent(username, password);
+
+            if (!isSuccessResponse(response)) {
+                JOptionPane.showMessageDialog(this, readResponseMessage(response, "Login gagal."), "Login gagal", JOptionPane.ERROR_MESSAGE);
                 return;
             }
 
-            new Dashboard(libraryApi).setVisible(true);
-            dispose();
+            saveTokenFromResponse(response);
+            openDashboard();
+
         } catch (SQLException exception) {
             JOptionPane.showMessageDialog(this, "Gagal terhubung ke backend: " + exception.getMessage(), "Error",
                     JOptionPane.ERROR_MESSAGE);
             logger.log(java.util.logging.Level.SEVERE, "Login gagal", exception);
+
+        } catch (ReflectiveOperationException exception) {
+            JOptionPane.showMessageDialog(this, "Method loginPersistent / restoreSession belum cocok di LibraryApi: "
+                    + exception.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            logger.log(java.util.logging.Level.SEVERE, "Login persistent gagal", exception);
+
         } catch (IllegalArgumentException exception) {
             JOptionPane.showMessageDialog(this, exception.getMessage(), "Validasi", JOptionPane.WARNING_MESSAGE);
         }
+    }
+
+    private Object loginPersistent(String username, String password)
+            throws SQLException, ReflectiveOperationException {
+
+        try {
+            return libraryApi.getClass()
+                    .getMethod("loginPersistent", String.class, String.class)
+                    .invoke(libraryApi, username, password);
+
+        } catch (NoSuchMethodException notYetAvailable) {
+            return libraryApi.login(username, password);
+
+        } catch (java.lang.reflect.InvocationTargetException wrapped) {
+            Throwable cause = wrapped.getCause();
+
+            if (cause instanceof SQLException) {
+                throw (SQLException) cause;
+            }
+
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+
+            throw wrapped;
+        }
+    }
+
+    private void saveTokenFromResponse(Object response) {
+        String token = readStringProperty(response, "getSessionToken");
+
+        if (token == null) {
+            token = readStringProperty(response, "getToken");
+        }
+
+        AuthSessionStore.saveSessionToken(token);
+    }
+
+    private boolean isSuccessResponse(Object response) {
+        if (response == null) {
+            return false;
+        }
+
+        try {
+            return Boolean.TRUE.equals(response.getClass().getMethod("isSuccess").invoke(response));
+        } catch (ReflectiveOperationException exception) {
+            return false;
+        }
+    }
+
+    private String readResponseMessage(Object response, String fallback) {
+        String message = readStringProperty(response, "getMessage");
+        return message == null || message.isBlank() ? fallback : message;
+    }
+
+    private String readStringProperty(Object target, String getter) {
+        if (target == null) {
+            return null;
+        }
+
+        try {
+            Object value = target.getClass().getMethod(getter).invoke(target);
+            return value == null ? null : String.valueOf(value);
+
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private void openDashboard() {
+        new Dashboard(libraryApi).setVisible(true);
+        dispose();
+    }
+
+    private static boolean tryRestoreSessionAndOpenDashboard(com.mycompany.perpustakaan.api.LibraryApi api) {
+        String token = AuthSessionStore.getSessionToken();
+
+        if (token == null) {
+            return false;
+        }
+
+        try {
+            Object response;
+
+            try {
+                response = api.getClass().getMethod("restoreSession", String.class).invoke(api, token);
+            } catch (NoSuchMethodException noTokenParam) {
+                response = api.getClass().getMethod("restoreSession").invoke(api);
+            }
+
+            boolean success = false;
+
+            try {
+                success = Boolean.TRUE.equals(response.getClass().getMethod("isSuccess").invoke(response));
+            } catch (ReflectiveOperationException ignored) {
+                success = api.getCurrentUser() != null;
+            }
+
+            if (success) {
+                new Dashboard(api).setVisible(true);
+                return true;
+            }
+
+        } catch (ReflectiveOperationException exception) {
+            logger.log(java.util.logging.Level.INFO, "Restore session gagal, kembali ke login", exception);
+        }
+
+        AuthSessionStore.clear();
+        return false;
     }
 
     private void openSignUp() {
@@ -553,6 +670,12 @@ public class LoginForm extends JFrame {
     }
 
     public static void main(String args[]) {
-        java.awt.EventQueue.invokeLater(() -> new LoginForm().setVisible(true));
+        java.awt.EventQueue.invokeLater(() -> {
+            com.mycompany.perpustakaan.api.LibraryApi api = new com.mycompany.perpustakaan.api.LibraryApi();
+
+            if (!tryRestoreSessionAndOpenDashboard(api)) {
+                new LoginForm(api).setVisible(true);
+            }
+        });
     }
 }

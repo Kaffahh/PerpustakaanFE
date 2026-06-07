@@ -717,29 +717,107 @@ public class Dashboard extends JFrame {
         if (!requireAdminView()) {
             return;
         }
+
         resetContent();
         addTitle("Laporan Inventory");
-        addQuickActions(new String[] { "Export PDF", "Export XLSX", "Tambah Buku" },
-                new Runnable[] { () -> exportInventory("pdf"), () -> exportInventory("xlsx"),
-                        this::showAddBookDialog });
-        try {
-            DefaultTableModel model = new DefaultTableModel(
-                    new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Stok", "Status" }, 0);
-            for (com.mycompany.perpustakaan.api.InventoryReportRow row : libraryApi.getInventoryReport()) {
-                model.addRow(new Object[] {
-                        row.getIdBuku(),
-                        row.getKodeBuku(),
-                        row.getJudul(),
-                        row.getPenulis(),
-                        row.getKategori(),
-                        row.getStokTersedia() + "/" + row.getStokTotal(),
-                        row.getStatusKetersediaan()
-                });
+
+        JTextField search = createModernSearchField("Cari kode / judul / penulis / kategori...");
+        JButton load = createActionButton("Tampilkan");
+        JButton pdf = createActionButton("Export PDF");
+        JButton xlsx = createActionButton("Export XLSX");
+        JButton addBook = createActionButton("Tambah Buku");
+
+        JPanel toolbar = createToolbarPanel();
+        toolbar.add(search);
+        toolbar.add(load);
+        toolbar.add(pdf);
+        toolbar.add(xlsx);
+        toolbar.add(addBook);
+
+        contentPanel.add(toolbar);
+        contentPanel.add(Box.createVerticalStrut(15));
+
+        JPanel tableHolder = createDynamicContentPanel();
+        contentPanel.add(tableHolder);
+
+        final int[] currentPage = { 1 };
+        final int pageSize = 25;
+
+        final Runnable[] render = new Runnable[1];
+
+        render[0] = () -> {
+            tableHolder.removeAll();
+
+            try {
+                String keyword = searchText(search, "Cari kode / judul / penulis / kategori...");
+
+                Object page = invokeApi(
+                        "getInventoryReport",
+                        new Class<?>[] { String.class, int.class, int.class },
+                        keyword,
+                        currentPage[0],
+                        pageSize);
+
+                List<com.mycompany.perpustakaan.api.InventoryReportRow> rows = extractList(
+                        page,
+                        "getRows",
+                        "getItems",
+                        "getInventory",
+                        "getData");
+
+                if (rows == null) {
+                    rows = libraryApi.getInventoryReport();
+                    rows = filterInventoryRows(rows, keyword);
+                    rows = slice(rows, currentPage[0], pageSize);
+                }
+
+                DefaultTableModel model = new DefaultTableModel(
+                        new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Stok", "Status" },
+                        0);
+
+                if (rows == null || rows.isEmpty()) {
+                    model.addRow(new Object[] { "-", "Tidak ada data", "-", "-", "-", "-", "-" });
+                } else {
+                    for (com.mycompany.perpustakaan.api.InventoryReportRow row : rows) {
+                        model.addRow(new Object[] {
+                                row.getIdBuku(),
+                                row.getKodeBuku(),
+                                row.getJudul(),
+                                row.getPenulis(),
+                                row.getKategori(),
+                                row.getStokTersedia() + "/" + row.getStokTotal(),
+                                row.getStatusKetersediaan()
+                        });
+                    }
+                }
+
+                JPanel panel = createDynamicContentPanel();
+                panel.add(createTablePanel(model, 520));
+                panel.add(createPaginationFooter(page, currentPage, pageSize, render[0]));
+
+                tableHolder.add(panel);
+                refreshContent();
+
+            } catch (SQLException e) {
+                showError("Gagal memuat laporan inventory", e);
             }
-            contentPanel.add(createTablePanel(model, 560));
-        } catch (SQLException e) {
-            showError("Gagal memuat laporan inventory", e);
-        }
+        };
+
+        load.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
+        search.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
+        pdf.addActionListener(e -> exportInventory("pdf"));
+        xlsx.addActionListener(e -> exportInventory("xlsx"));
+        addBook.addActionListener(e -> showAddBookDialog());
+
+        render[0].run();
         refreshContent();
     }
 
@@ -806,26 +884,72 @@ public class Dashboard extends JFrame {
         if (!requireAdminView()) {
             return;
         }
+
         resetContent();
         addTitle("Laporan Buku Populer");
-        try {
-            DefaultTableModel model = new DefaultTableModel(
-                    new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Dipinjam", "Stok" }, 0);
-            for (com.mycompany.perpustakaan.api.PopularBookReportRow row : libraryApi.getPopularBookReport(25)) {
-                model.addRow(new Object[] {
-                        row.getIdBuku(),
-                        row.getKodeBuku(),
-                        row.getJudul(),
-                        row.getPenulis(),
-                        row.getKategori(),
-                        row.getTotalDipinjam(),
-                        row.getStokTersedia() + "/" + row.getStokTotal()
-                });
+
+        JPanel tableHolder = createDynamicContentPanel();
+        contentPanel.add(tableHolder);
+
+        final int[] currentPage = { 1 };
+        final int pageSize = 25;
+
+        final Runnable[] render = new Runnable[1];
+
+        render[0] = () -> {
+            tableHolder.removeAll();
+
+            try {
+                Object page = invokeApi(
+                        "getPopularBookReport",
+                        new Class<?>[] { int.class, int.class },
+                        currentPage[0],
+                        pageSize);
+
+                List<com.mycompany.perpustakaan.api.PopularBookReportRow> rows = extractList(
+                        page,
+                        "getRows",
+                        "getItems",
+                        "getBooks",
+                        "getData");
+
+                if (rows == null) {
+                    rows = libraryApi.getPopularBookReport(pageSize);
+                }
+
+                DefaultTableModel model = new DefaultTableModel(
+                        new Object[] { "ID", "Kode", "Judul", "Penulis", "Kategori", "Dipinjam", "Stok" },
+                        0);
+
+                if (rows == null || rows.isEmpty()) {
+                    model.addRow(new Object[] { "-", "Tidak ada data", "-", "-", "-", "-", "-" });
+                } else {
+                    for (com.mycompany.perpustakaan.api.PopularBookReportRow row : rows) {
+                        model.addRow(new Object[] {
+                                row.getIdBuku(),
+                                row.getKodeBuku(),
+                                row.getJudul(),
+                                row.getPenulis(),
+                                row.getKategori(),
+                                row.getTotalDipinjam(),
+                                row.getStokTersedia() + "/" + row.getStokTotal()
+                        });
+                    }
+                }
+
+                JPanel panel = createDynamicContentPanel();
+                panel.add(createTablePanel(model, 540));
+                panel.add(createPaginationFooter(page, currentPage, pageSize, render[0]));
+
+                tableHolder.add(panel);
+                refreshContent();
+
+            } catch (SQLException e) {
+                showError("Gagal memuat laporan buku populer", e);
             }
-            contentPanel.add(createTablePanel(model, 560));
-        } catch (SQLException e) {
-            showError("Gagal memuat laporan buku populer", e);
-        }
+        };
+
+        render[0].run();
         refreshContent();
     }
 
@@ -833,6 +957,7 @@ public class Dashboard extends JFrame {
         if (!requireAdminView()) {
             return;
         }
+
         resetContent();
         addTitle("Laporan Kunjungan");
 
@@ -840,13 +965,19 @@ public class Dashboard extends JFrame {
         JComboBox<String> status = new JComboBox<>(new String[] { "semua", "datang", "selesai", "batal" });
         status.setPreferredSize(new Dimension(150, 38));
         status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
         JButton load = createActionButton("Tampilkan");
+        JButton pdf = createActionButton("Export PDF");
+        JButton xlsx = createActionButton("Export XLSX");
 
         JPanel toolbar = createToolbarPanel();
         toolbar.add(search);
         toolbar.add(new JLabel("Status"));
         toolbar.add(status);
         toolbar.add(load);
+        toolbar.add(pdf);
+        toolbar.add(xlsx);
+
         contentPanel.add(toolbar);
         contentPanel.add(Box.createVerticalStrut(15));
 
@@ -854,14 +985,23 @@ public class Dashboard extends JFrame {
         contentPanel.add(tableHolder);
 
         final Runnable[] render = new Runnable[1];
+
         render[0] = () -> {
             tableHolder.removeAll();
+
             try {
                 String keyword = searchText(search, "Cari pengunjung / asal / keperluan...");
-                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                String selectedStatus = status.getSelectedItem() == null
+                        ? "semua"
+                        : status.getSelectedItem().toString();
+
                 DefaultTableModel model = new DefaultTableModel(
-                        new Object[] { "ID", "Nama", "Jenis", "Asal", "Keperluan", "Status", "Tanggal" }, 0);
-                List<com.mycompany.perpustakaan.api.VisitReportRow> rows = libraryApi.getVisitReport(keyword, selectedStatus);
+                        new Object[] { "ID", "Nama", "Jenis", "Asal", "Keperluan", "Status", "Tanggal" },
+                        0);
+
+                List<com.mycompany.perpustakaan.api.VisitReportRow> rows = libraryApi.getVisitReport(keyword,
+                        selectedStatus);
+
                 if (rows.isEmpty()) {
                     model.addRow(new Object[] { "-", "Belum ada data", "-", "-", "-", "-", "-" });
                 } else {
@@ -877,8 +1017,10 @@ public class Dashboard extends JFrame {
                         });
                     }
                 }
+
                 tableHolder.add(createTablePanel(model, 520));
                 refreshContent();
+
             } catch (SQLException e) {
                 showError("Gagal memuat laporan kunjungan", e);
             }
@@ -887,11 +1029,22 @@ public class Dashboard extends JFrame {
         load.addActionListener(e -> render[0].run());
         search.addActionListener(e -> render[0].run());
         status.addActionListener(e -> render[0].run());
+
+        pdf.addActionListener(e -> exportVisit(
+                "pdf",
+                searchText(search, "Cari pengunjung / asal / keperluan..."),
+                status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString()));
+
+        xlsx.addActionListener(e -> exportVisit(
+                "xlsx",
+                searchText(search, "Cari pengunjung / asal / keperluan..."),
+                status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString()));
+
         render[0].run();
         refreshContent();
     }
 
-private void showBookManagement() {
+    private void showBookManagement() {
         if (!requireStaffOrAdminView()) {
             return;
         }
@@ -1201,7 +1354,7 @@ private void showBookManagement() {
         return actions;
     }
 
-private JButton createDangerButton(String text) {
+    private JButton createDangerButton(String text) {
         JButton button = new GradientActionButton(text);
         button.setFont(new Font("Segoe UI", Font.BOLD, 12));
         button.setForeground(WHITE);
@@ -1212,101 +1365,113 @@ private JButton createDangerButton(String text) {
         button.setOpaque(false);
         button.setBorder(new EmptyBorder(10, 17, 10, 17));
         button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
-    return button;
-}
-
-private void showCategoryManagement() {
-    if (!requireAdminView()) {
-        return;
+        return button;
     }
-    resetContent();
-    addTitle("Manajemen Kategori");
 
-    addDashboardHero(
-            "Kelola Kategori Buku",
-            "Pantau jumlah buku per kategori, ubah nama kategori, atau lepas kategori dari buku.");
+    private void showCategoryManagement() {
+        if (!requireAdminView()) {
+            return;
+        }
 
-    try {
-        JTable table = createTable(createCategoryTableModel(libraryApi.getCategorySummaries()));
-        contentPanel.add(wrapTable(table, 460));
+        resetContent();
+        addTitle("Manajemen Kategori");
 
-        JPanel actions = createToolbarPanel();
-        JButton rename = createActionButton("Rename");
-        JButton clear = createDangerButton("Lepas Kategori");
-        JButton refresh = createNeutralButton("Refresh");
-        rename.addActionListener(e -> renameSelectedCategory(table));
-        clear.addActionListener(e -> clearSelectedCategory(table));
-        refresh.addActionListener(e -> showCategoryManagement());
-        actions.add(rename);
-        actions.add(clear);
-        actions.add(refresh);
-        contentPanel.add(actions);
-    } catch (SQLException e) {
-        showError("Gagal memuat kategori", e);
+        addDashboardHero(
+                "Kelola Kategori Buku",
+                "Pantau jumlah buku per kategori, tambah kategori master, ubah nama kategori, atau lepas kategori dari buku.");
+
+        try {
+            JTable table = createTable(createCategoryTableModel(libraryApi.getCategorySummaries()));
+            contentPanel.add(wrapTable(table, 460));
+
+            JPanel actions = createToolbarPanel();
+
+            JButton create = createActionButton("Tambah Kategori");
+            JButton rename = createActionButton("Rename");
+            JButton clear = createDangerButton("Lepas Kategori");
+            JButton refresh = createNeutralButton("Refresh");
+
+            create.addActionListener(e -> createCategoryMaster());
+            rename.addActionListener(e -> renameSelectedCategory(table));
+            clear.addActionListener(e -> clearSelectedCategory(table));
+            refresh.addActionListener(e -> showCategoryManagement());
+
+            actions.add(create);
+            actions.add(rename);
+            actions.add(clear);
+            actions.add(refresh);
+
+            contentPanel.add(actions);
+
+        } catch (SQLException e) {
+            showError("Gagal memuat kategori", e);
+        }
+
+        refreshContent();
     }
-    refreshContent();
-}
 
-private DefaultTableModel createCategoryTableModel(List<com.mycompany.perpustakaan.api.CategorySummary> categories) {
-    DefaultTableModel model = new DefaultTableModel(
-            new Object[] { "Kategori", "Total Buku", "Stok Tersedia", "Stok Total" }, 0);
-    if (categories == null || categories.isEmpty()) {
-        model.addRow(new Object[] { "Belum ada kategori", "-", "-", "-" });
+    private DefaultTableModel createCategoryTableModel(
+            List<com.mycompany.perpustakaan.api.CategorySummary> categories) {
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[] { "Kategori", "Total Buku", "Stok Tersedia", "Stok Total" }, 0);
+        if (categories == null || categories.isEmpty()) {
+            model.addRow(new Object[] { "Belum ada kategori", "-", "-", "-" });
+            return model;
+        }
+        for (com.mycompany.perpustakaan.api.CategorySummary category : categories) {
+            model.addRow(new Object[] {
+                    category.getNamaKategori(),
+                    category.getTotalBuku(),
+                    category.getStokTersedia(),
+                    category.getStokTotal()
+            });
+        }
         return model;
     }
-    for (com.mycompany.perpustakaan.api.CategorySummary category : categories) {
-        model.addRow(new Object[] {
-                category.getNamaKategori(),
-                category.getTotalBuku(),
-                category.getStokTersedia(),
-                category.getStokTotal()
-        });
-    }
-    return model;
-}
 
-private void renameSelectedCategory(JTable table) {
-    String category = selectedString(table, 0);
-    if (category == null || "Belum ada kategori".equals(category)) {
-        return;
-    }
-    JTextField newName = createField(category);
-    int result = JOptionPane.showConfirmDialog(this, newName, "Nama kategori baru",
-            JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-    if (result != JOptionPane.OK_OPTION) {
-        return;
-    }
-    try {
-        com.mycompany.perpustakaan.api.BookResponse response = libraryApi.renameCategory(category, newName.getText());
-        showResponse(response.isSuccess(), response.getMessage());
-        if (response.isSuccess()) {
-            showCategoryManagement();
+    private void renameSelectedCategory(JTable table) {
+        String category = selectedString(table, 0);
+        if (category == null || "Belum ada kategori".equals(category)) {
+            return;
         }
-    } catch (SQLException e) {
-        showError("Gagal rename kategori", e);
+        JTextField newName = createField(category);
+        int result = JOptionPane.showConfirmDialog(this, newName, "Nama kategori baru",
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        if (result != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            com.mycompany.perpustakaan.api.BookResponse response = libraryApi.renameCategory(category,
+                    newName.getText());
+            showResponse(response.isSuccess(), response.getMessage());
+            if (response.isSuccess()) {
+                showCategoryManagement();
+            }
+        } catch (SQLException e) {
+            showError("Gagal rename kategori", e);
+        }
     }
-}
 
-private void clearSelectedCategory(JTable table) {
-    String category = selectedString(table, 0);
-    if (category == null || "Belum ada kategori".equals(category)) {
-        return;
-    }
-    int confirm = JOptionPane.showConfirmDialog(this, "Lepas kategori " + category + " dari semua buku?",
-            "Konfirmasi", JOptionPane.YES_NO_OPTION);
-    if (confirm != JOptionPane.YES_OPTION) {
-        return;
-    }
-    try {
-        com.mycompany.perpustakaan.api.BookResponse response = libraryApi.clearCategory(category);
-        showResponse(response.isSuccess(), response.getMessage());
-        if (response.isSuccess()) {
-            showCategoryManagement();
+    private void clearSelectedCategory(JTable table) {
+        String category = selectedString(table, 0);
+        if (category == null || "Belum ada kategori".equals(category)) {
+            return;
         }
-    } catch (SQLException e) {
-        showError("Gagal melepas kategori", e);
+        int confirm = JOptionPane.showConfirmDialog(this, "Lepas kategori " + category + " dari semua buku?",
+                "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            com.mycompany.perpustakaan.api.BookResponse response = libraryApi.clearCategory(category);
+            showResponse(response.isSuccess(), response.getMessage());
+            if (response.isSuccess()) {
+                showCategoryManagement();
+            }
+        } catch (SQLException e) {
+            showError("Gagal melepas kategori", e);
+        }
     }
-}
 
     private void showLoanManagement() {
         if (!requireStaffOrAdminView()) {
@@ -1330,7 +1495,7 @@ private void clearSelectedCategory(JTable table) {
 
         JPanel tableHolder = createDynamicContentPanel();
         contentPanel.add(tableHolder);
-        final int[] currentPage = {1};
+        final int[] currentPage = { 1 };
         final int pageSize = 50;
 
         final Runnable[] render = new Runnable[1];
@@ -1429,7 +1594,7 @@ private void clearSelectedCategory(JTable table) {
         JPanel actionHolder = createDynamicContentPanel();
         contentPanel.add(tableHolder);
         contentPanel.add(actionHolder);
-        final int[] currentPage = {1};
+        final int[] currentPage = { 1 };
         final int pageSize = 50;
 
         final Runnable[] render = new Runnable[1];
@@ -1438,13 +1603,15 @@ private void clearSelectedCategory(JTable table) {
             actionHolder.removeAll();
             try {
                 String keyword = searchText(search, "Cari user / buku...");
-                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                String selectedStatus = status.getSelectedItem() == null ? "semua"
+                        : status.getSelectedItem().toString();
                 int totalItems = libraryApi.countFines(keyword, selectedStatus);
                 int totalPages = calculateTotalPages(totalItems, pageSize);
                 if (totalPages > 0 && currentPage[0] > totalPages) {
                     currentPage[0] = totalPages;
                 }
-                List<com.mycompany.perpustakaan.api.FineSummary> fines = libraryApi.getFines(keyword, selectedStatus, currentPage[0], pageSize);
+                List<com.mycompany.perpustakaan.api.FineSummary> fines = libraryApi.getFines(keyword, selectedStatus,
+                        currentPage[0], pageSize);
                 JTable table = createTable(createFineTableModel(fines));
                 tableHolder.add(wrapTable(table, 500));
 
@@ -1502,7 +1669,8 @@ private void clearSelectedCategory(JTable table) {
 
     private DefaultTableModel createFineTableModel(List<com.mycompany.perpustakaan.api.FineSummary> fines) {
         DefaultTableModel model = new DefaultTableModel(
-                new Object[] { "ID Peminjaman", "User", "Username", "Buku", "Jatuh Tempo", "Kembali", "Denda", "Status" },
+                new Object[] { "ID Peminjaman", "User", "Username", "Buku", "Jatuh Tempo", "Kembali", "Denda",
+                        "Status" },
                 0);
         if (fines == null || fines.isEmpty()) {
             model.addRow(new Object[] { "-", "Belum ada denda", "-", "-", "-", "-", "-", "-" });
@@ -1564,6 +1732,7 @@ private void clearSelectedCategory(JTable table) {
         if (!requireStaffOrAdminView()) {
             return;
         }
+
         resetContent();
         addTitle("Member Management");
 
@@ -1576,42 +1745,62 @@ private void clearSelectedCategory(JTable table) {
         JPanel tableHolder = createDynamicContentPanel();
         JPanel actionHolder = createDynamicContentPanel();
 
+        final int[] currentPage = { 1 };
+        final int pageSize = 25;
+
         final Runnable[] render = new Runnable[1];
+
         render[0] = () -> {
             tableHolder.removeAll();
             actionHolder.removeAll();
+
             try {
                 String keyword = searchText(search, "Cari nama / username / email...");
-                String selectedStatus = status.getSelectedItem() == null ? "semua"
+                String selectedStatus = status.getSelectedItem() == null
+                        ? "semua"
                         : status.getSelectedItem().toString();
-                com.mycompany.perpustakaan.api.MemberPage page = libraryApi.searchMembers(keyword, selectedStatus, 1,
-                        50);
+
+                com.mycompany.perpustakaan.api.MemberPage page = libraryApi.searchMembers(keyword, selectedStatus,
+                        currentPage[0], pageSize);
+
                 DefaultTableModel model = createMemberManagementTableModel(page.getMembers());
                 JTable table = createTable(model);
-                tableHolder.add(wrapTable(table, 520));
+
+                JPanel tablePanel = createDynamicContentPanel();
+                tablePanel.add(wrapTable(table, 500));
+                tablePanel.add(createPaginationFooter(page, currentPage, pageSize, render[0]));
+
+                tableHolder.add(tablePanel);
 
                 JPanel actions = createToolbarPanel();
+
                 if (isAdmin()) {
                     JButton update = createActionButton("Update");
                     JButton suspend = createActionButton("Suspend");
                     JButton activate = createActionButton("Aktifkan");
                     JButton delete = createDangerButton("Hapus");
+
                     update.addActionListener(e -> updateSelectedMember(table));
                     suspend.addActionListener(e -> changeSelectedMemberStatus(table, true));
                     activate.addActionListener(e -> changeSelectedMemberStatus(table, false));
                     delete.addActionListener(e -> deleteSelectedMember(table));
+
                     actions.add(update);
                     actions.add(suspend);
                     actions.add(activate);
                     actions.add(delete);
+
                 } else {
-                    JLabel readOnlyHint = new JLabel("Mode staff: data member hanya bisa dilihat. Perubahan member khusus admin.");
+                    JLabel readOnlyHint = new JLabel(
+                            "Mode staff: data member hanya bisa dilihat. Perubahan member khusus admin.");
                     readOnlyHint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
                     readOnlyHint.setForeground(TEXT_GRAY);
                     actions.add(readOnlyHint);
                 }
+
                 actionHolder.add(actions);
                 refreshContent();
+
             } catch (SQLException e) {
                 showError("Gagal memuat member management", e);
             }
@@ -1620,23 +1809,39 @@ private void clearSelectedCategory(JTable table) {
         JButton searchButton = (JButton) toolbar.getClientProperty("searchButton");
         JButton refreshButton = (JButton) toolbar.getClientProperty("refreshButton");
         JButton addButton = (JButton) toolbar.getClientProperty("addButton");
-        searchButton.addActionListener(e -> render[0].run());
+
+        searchButton.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
         refreshButton.addActionListener(e -> {
             search.setText("Cari nama / username / email...");
             search.setForeground(TEXT_GRAY);
             status.setSelectedItem("semua");
+            currentPage[0] = 1;
             render[0].run();
         });
+
         if (addButton != null) {
             addButton.addActionListener(e -> showAddMemberDialog());
         }
-        search.addActionListener(e -> render[0].run());
-        status.addActionListener(e -> render[0].run());
+
+        search.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
+        status.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
 
         contentPanel.add(toolbar);
         contentPanel.add(Box.createVerticalStrut(15));
         contentPanel.add(tableHolder);
         contentPanel.add(actionHolder);
+
         render[0].run();
         refreshContent();
     }
@@ -1687,24 +1892,67 @@ private void clearSelectedCategory(JTable table) {
         if (!requireStaffOrAdminView()) {
             return;
         }
+
         resetContent();
         addTitle("Pending Loan Requests");
-        addQuickActions(new String[] { "Refresh" }, new Runnable[] { this::showPendingLoanRequests });
-        try {
-            List<com.mycompany.perpustakaan.api.LoanSummary> pendingLoans = libraryApi.getPendingLoanRequests();
-            DefaultTableModel model = createPendingLoanTableModel(pendingLoans);
-            JTable table = createTable(model);
-            installPendingLoanActionColumn(table);
-            contentPanel.add(wrapTable(table, 480));
-        } catch (SQLException e) {
-            showError("Gagal memuat pending loan requests", e);
-        }
+
+        JPanel tableHolder = createDynamicContentPanel();
+        contentPanel.add(tableHolder);
+
+        final int[] currentPage = { 1 };
+        final int pageSize = 25;
+
+        final Runnable[] render = new Runnable[1];
+
+        render[0] = () -> {
+            tableHolder.removeAll();
+
+            try {
+                Object page = invokeApi(
+                        "getPendingLoanRequests",
+                        new Class<?>[] { int.class, int.class },
+                        currentPage[0],
+                        pageSize);
+
+                List<com.mycompany.perpustakaan.api.LoanSummary> pendingLoans = extractList(
+                        page,
+                        "getLoans",
+                        "getItems",
+                        "getRows",
+                        "getData");
+
+                if (pendingLoans == null) {
+                    pendingLoans = libraryApi.getPendingLoanRequests();
+                    pendingLoans = slice(pendingLoans, currentPage[0], pageSize);
+                }
+
+                DefaultTableModel model = createPendingLoanTableModel(pendingLoans);
+                JTable table = createTable(model);
+
+                installPendingLoanActionColumn(table);
+
+                JPanel panel = createDynamicContentPanel();
+                panel.add(wrapTable(table, 480));
+                panel.add(createPaginationFooter(page, currentPage, pageSize, render[0]));
+
+                tableHolder.add(panel);
+
+                refreshContent();
+
+            } catch (SQLException e) {
+                showError("Gagal memuat pending loan requests", e);
+            }
+        };
+
+        render[0].run();
         refreshContent();
     }
 
-    private DefaultTableModel createPendingLoanTableModel(List<com.mycompany.perpustakaan.api.LoanSummary> pendingLoans) {
+    private DefaultTableModel createPendingLoanTableModel(
+            List<com.mycompany.perpustakaan.api.LoanSummary> pendingLoans) {
         DefaultTableModel model = new DefaultTableModel(
-                new Object[] { "ID", "Peminjam", "Username", "Buku", "Tanggal Request", "Jatuh Tempo", "Status", "Aksi" },
+                new Object[] { "ID", "Peminjam", "Username", "Buku", "Tanggal Request", "Jatuh Tempo", "Status",
+                        "Aksi" },
                 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -1864,6 +2112,7 @@ private void clearSelectedCategory(JTable table) {
         if (!requireMemberView()) {
             return;
         }
+
         resetContent();
         addTitle("Request Pinjam Buku");
 
@@ -1871,6 +2120,7 @@ private void clearSelectedCategory(JTable table) {
         JComboBox<String> category = new JComboBox<>(loadCategoryOptions());
         category.setPreferredSize(new Dimension(180, 38));
         category.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+
         JButton cari = createActionButton("Cari");
         JButton refresh = createNeutralButton("Refresh");
 
@@ -1879,50 +2129,85 @@ private void clearSelectedCategory(JTable table) {
         toolbar.add(category);
         toolbar.add(cari);
         toolbar.add(refresh);
+
         contentPanel.add(toolbar);
         contentPanel.add(Box.createVerticalStrut(15));
 
         JPanel tableHolder = createDynamicContentPanel();
         JPanel actionHolder = createDynamicContentPanel();
+
         contentPanel.add(tableHolder);
         contentPanel.add(actionHolder);
 
+        final int[] currentPage = { 1 };
+        final int pageSize = 25;
+
         final Runnable[] render = new Runnable[1];
+
         render[0] = () -> {
             tableHolder.removeAll();
             actionHolder.removeAll();
+
             try {
                 String keyword = searchText(search, "Cari judul / penulis / kode buku...");
+
                 Object selectedCategory = category.getSelectedItem();
+
                 String categoryValue = selectedCategory == null || "Semua kategori".equals(selectedCategory.toString())
                         ? ""
                         : selectedCategory.toString();
-                com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage(keyword, categoryValue, 1, 50);
+
+                com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage(keyword, categoryValue,
+                        currentPage[0], pageSize);
+
                 DefaultTableModel model = createRequestLoanTableModel(page.getBooks());
                 JTable table = createTable(model);
-                tableHolder.add(wrapTable(table, 520));
+
+                JPanel tablePanel = createDynamicContentPanel();
+                tablePanel.add(wrapTable(table, 500));
+                tablePanel.add(createPaginationFooter(page, currentPage, pageSize, render[0]));
+
+                tableHolder.add(tablePanel);
 
                 JButton request = createActionButton("Request Pinjam Buku Terpilih");
                 request.addActionListener(e -> requestSelectedLoan(table));
+
                 JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 10));
                 footer.setOpaque(false);
                 footer.add(request);
+
                 actionHolder.add(footer);
+
                 refreshContent();
+
             } catch (SQLException e) {
                 showError("Gagal memuat buku", e);
             }
         };
 
-        cari.addActionListener(e -> render[0].run());
-        search.addActionListener(e -> render[0].run());
-        category.addActionListener(e -> render[0].run());
+        cari.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
+        search.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
+        category.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
         refresh.addActionListener(e -> {
             search.setText("Cari judul / penulis / kode buku...");
             search.setForeground(TEXT_GRAY);
             category.setSelectedItem("Semua kategori");
+            currentPage[0] = 1;
             render[0].run();
         });
+
         render[0].run();
         refreshContent();
     }
@@ -1992,7 +2277,8 @@ private void clearSelectedCategory(JTable table) {
         Runnable render = () -> {
             tableHolder.removeAll();
             try {
-                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                String selectedStatus = status.getSelectedItem() == null ? "semua"
+                        : status.getSelectedItem().toString();
                 com.mycompany.perpustakaan.api.HistoryPage page = libraryApi.getLoanHistory(selectedStatus, 1, 50);
                 tableHolder.add(createTablePanel(createLoanHistoryTableModel(page.getLoans()), 520));
                 refreshContent();
@@ -2303,7 +2589,7 @@ private void clearSelectedCategory(JTable table) {
         contentPanel.add(tableHolder);
         contentPanel.add(Box.createVerticalStrut(10));
         contentPanel.add(actionHolder);
-        final int[] currentPage = {1};
+        final int[] currentPage = { 1 };
         final int pageSize = 50;
 
         final Runnable[] render = new Runnable[1];
@@ -2312,13 +2598,15 @@ private void clearSelectedCategory(JTable table) {
             actionHolder.removeAll();
             try {
                 String keyword = searchText(search, "Cari pengunjung / asal / keperluan...");
-                String selectedStatus = status.getSelectedItem() == null ? "semua" : status.getSelectedItem().toString();
+                String selectedStatus = status.getSelectedItem() == null ? "semua"
+                        : status.getSelectedItem().toString();
                 int totalItems = libraryApi.countVisits(keyword, selectedStatus);
                 int totalPages = calculateTotalPages(totalItems, pageSize);
                 if (totalPages > 0 && currentPage[0] > totalPages) {
                     currentPage[0] = totalPages;
                 }
-                List<com.mycompany.perpustakaan.api.VisitSummary> visits = libraryApi.searchVisits(keyword, selectedStatus, currentPage[0], pageSize);
+                List<com.mycompany.perpustakaan.api.VisitSummary> visits = libraryApi.searchVisits(keyword,
+                        selectedStatus, currentPage[0], pageSize);
                 JTable table = createTable(createVisitManagementTableModel(visits));
                 tableHolder.add(wrapTable(table, 420));
                 JPanel visitActions = createVisitManagementActions(table);
@@ -2366,7 +2654,8 @@ private void clearSelectedCategory(JTable table) {
         refreshContent();
     }
 
-    private DefaultTableModel createVisitManagementTableModel(List<com.mycompany.perpustakaan.api.VisitSummary> visits) {
+    private DefaultTableModel createVisitManagementTableModel(
+            List<com.mycompany.perpustakaan.api.VisitSummary> visits) {
         DefaultTableModel model = new DefaultTableModel(
                 new Object[] { "ID", "Nama Pengunjung", "Jenis", "Asal Instansi", "Keperluan", "Status", "Tanggal" },
                 0);
@@ -2413,7 +2702,8 @@ private void clearSelectedCategory(JTable table) {
         try {
             com.mycompany.perpustakaan.api.VisitSummary visit = libraryApi.getVisitById(id);
             if (visit == null) {
-                JOptionPane.showMessageDialog(this, "Data kunjungan tidak ditemukan.", "Kunjungan", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Data kunjungan tidak ditemukan.", "Kunjungan",
+                        JOptionPane.WARNING_MESSAGE);
                 return;
             }
             String message = "Nama: " + safeOrDash(visit.getNamaPengunjung())
@@ -4098,9 +4388,27 @@ private void clearSelectedCategory(JTable table) {
     }
 
     private void performLogout() {
-        libraryApi.logout();
-        new LoginForm(libraryApi).setVisible(true);
-        dispose();
+        String token = AuthSessionStore.getSessionToken();
+
+        try {
+            if (token != null) {
+                try {
+                    libraryApi.getClass().getMethod("logout", String.class).invoke(libraryApi, token);
+                } catch (NoSuchMethodException fallback) {
+                    libraryApi.logout();
+                }
+            } else {
+                libraryApi.logout();
+            }
+
+        } catch (ReflectiveOperationException exception) {
+            logger.log(java.util.logging.Level.WARNING, "Gagal revoke token saat logout", exception);
+
+        } finally {
+            AuthSessionStore.clear();
+            new LoginForm(new com.mycompany.perpustakaan.api.LibraryApi()).setVisible(true);
+            dispose();
+        }
     }
 
     private void addTitle(String title) {
@@ -4598,35 +4906,62 @@ private void clearSelectedCategory(JTable table) {
                 "Cari buku favorit kamu berdasarkan judul, penulis, kategori, dan ketersediaan stok.");
 
         searchField = createModernSearchField("Cari judul / penulis / kode buku...");
-        categoryFilter = new JComboBox<>(new String[] { "Semua kategori" });
+        categoryFilter = new JComboBox<>(loadCategoryOptions());
         categoryFilter.setPreferredSize(new Dimension(180, 38));
         categoryFilter.setFont(new Font("Segoe UI", Font.PLAIN, 12));
 
         JPanel resultHolder = createDynamicContentPanel();
 
-        Runnable render = () -> {
+        final int[] currentPage = { 1 };
+        final int pageSize = 12;
+
+        final Runnable[] render = new Runnable[1];
+
+        render[0] = () -> {
             resultHolder.removeAll();
 
             try {
                 String keyword = searchText(searchField, "Cari judul / penulis / kode buku...");
-                com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage(keyword, "", 1, 100);
-                List<com.mycompany.perpustakaan.api.BookSummary> books = page.getBooks();
 
-                resultHolder.add(createBookshelfGrid(books));
+                Object selectedCategory = categoryFilter.getSelectedItem();
+
+                String categoryValue = selectedCategory == null || "Semua kategori".equals(selectedCategory.toString())
+                        ? ""
+                        : selectedCategory.toString();
+
+                com.mycompany.perpustakaan.api.BookshelfPage page = libraryApi.getBookshelfPage(keyword, categoryValue,
+                        currentPage[0], pageSize);
+
+                resultHolder.add(createBookshelfGrid(page.getBooks()));
+                resultHolder.add(createPaginationFooter(page, currentPage, pageSize, render[0]));
+
                 refreshContent();
+
             } catch (SQLException e) {
                 showError("Gagal memuat bookshelf", e);
             }
         };
 
-        JPanel toolbar = createBookshelfToolbar(render);
+        JPanel toolbar = createBookshelfToolbar(() -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
         contentPanel.add(toolbar);
         contentPanel.add(Box.createVerticalStrut(20));
         contentPanel.add(resultHolder);
 
-        searchField.addActionListener(e -> render.run());
-        render.run();
+        searchField.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
 
+        categoryFilter.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
+        render[0].run();
         refreshContent();
     }
 
@@ -5099,31 +5434,316 @@ private void clearSelectedCategory(JTable table) {
         }
         Object value = table.getValueAt(selected, column);
         if (value == null || String.valueOf(value).trim().isEmpty() || "-".equals(String.valueOf(value))) {
-            JOptionPane.showMessageDialog(this, "Data ini bukan baris yang bisa diproses.", "Info", JOptionPane.INFORMATION_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Data ini bukan baris yang bisa diproses.", "Info",
+                    JOptionPane.INFORMATION_MESSAGE);
             return null;
         }
         return String.valueOf(value).trim();
     }
 
-    private String chooseDirectory() {
-        JFileChooser chooser = new JFileChooser(new File(System.getProperty("user.home"), "Documents"));
-        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-        int result = chooser.showSaveDialog(this);
-        if (result == JFileChooser.APPROVE_OPTION) {
-            return chooser.getSelectedFile().getAbsolutePath();
+    private Object invokeApi(String methodName, Class<?>[] parameterTypes, Object... args) throws SQLException {
+        try {
+            return libraryApi.getClass().getMethod(methodName, parameterTypes).invoke(libraryApi, args);
+
+        } catch (NoSuchMethodException missing) {
+            return null;
+
+        } catch (java.lang.reflect.InvocationTargetException wrapped) {
+            Throwable cause = wrapped.getCause();
+
+            if (cause instanceof SQLException) {
+                throw (SQLException) cause;
+            }
+
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+
+            throw new IllegalStateException(cause);
+
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(exception);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> List<T> extractList(Object pageOrList, String... getters) {
+        if (pageOrList == null) {
+            return null;
+        }
+
+        if (pageOrList instanceof List<?>) {
+            return (List<T>) pageOrList;
+        }
+
+        for (String getter : getters) {
+            try {
+                Object value = pageOrList.getClass().getMethod(getter).invoke(pageOrList);
+
+                if (value instanceof List<?>) {
+                    return (List<T>) value;
+                }
+
+            } catch (ReflectiveOperationException ignored) {
+                // coba getter berikutnya
+            }
+        }
+
         return null;
     }
 
-    private LocalDate parseDate(String value) {
-        return LocalDate.parse(value.trim());
+    private int pageInt(Object page, String getter, int fallback) {
+        if (page == null) {
+            return fallback;
+        }
+
+        try {
+            Object value = page.getClass().getMethod(getter).invoke(page);
+            return value == null ? fallback : Integer.parseInt(String.valueOf(value));
+
+        } catch (ReflectiveOperationException | NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
+    private boolean pageBool(Object page, String getter, boolean fallback) {
+        if (page == null) {
+            return fallback;
+        }
+
+        try {
+            Object value = page.getClass().getMethod(getter).invoke(page);
+            return value == null ? fallback : Boolean.parseBoolean(String.valueOf(value));
+
+        } catch (ReflectiveOperationException ignored) {
+            return fallback;
+        }
+    }
+
+    private JPanel createPaginationFooter(Object page, int[] currentPage, int pageSize, Runnable render) {
+        JPanel footer = createToolbarPanel();
+
+        JButton prev = createNeutralButton("Prev");
+        JButton next = createNeutralButton("Next");
+
+        int pageNumber = pageInt(page, "getPage", currentPage[0]);
+        int totalPages = pageInt(page, "getTotalPages", 0);
+        int totalItems = pageInt(page, "getTotalItems", 0);
+
+        if (totalPages <= 0 && totalItems > 0) {
+            totalPages = calculateTotalPages(totalItems, pageSize);
+        }
+
+        if (totalPages <= 0) {
+            totalPages = currentPage[0];
+        }
+
+        boolean hasPrev = pageBool(page, "hasPreviousPage", currentPage[0] > 1);
+        boolean hasNext = pageBool(page, "hasNextPage", totalPages > currentPage[0]);
+
+        JLabel pageInfo = new JLabel(
+                "Halaman " + pageNumber + " / " + Math.max(1, totalPages)
+                        + (totalItems > 0 ? " - Total " + totalItems + " data" : ""));
+
+        pageInfo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        pageInfo.setForeground(TEXT_GRAY);
+
+        prev.setEnabled(hasPrev);
+        next.setEnabled(hasNext);
+
+        prev.addActionListener(e -> {
+            currentPage[0] = Math.max(1, currentPage[0] - 1);
+            render.run();
+        });
+
+        next.addActionListener(e -> {
+            currentPage[0]++;
+            render.run();
+        });
+
+        footer.add(prev);
+        footer.add(next);
+        footer.add(pageInfo);
+
+        return footer;
+    }
+
+    private <T> List<T> slice(List<T> rows, int page, int pageSize) {
+        if (rows == null || rows.isEmpty()) {
+            return rows;
+        }
+
+        int from = Math.max(0, (page - 1) * pageSize);
+
+        if (from >= rows.size()) {
+            return Collections.emptyList();
+        }
+
+        int to = Math.min(rows.size(), from + pageSize);
+
+        return new ArrayList<>(rows.subList(from, to));
+    }
+
+    private List<com.mycompany.perpustakaan.api.InventoryReportRow> filterInventoryRows(
+            List<com.mycompany.perpustakaan.api.InventoryReportRow> rows,
+            String keyword) {
+        if (rows == null || keyword == null || keyword.isBlank()) {
+            return rows;
+        }
+
+        String q = keyword.toLowerCase();
+
+        List<com.mycompany.perpustakaan.api.InventoryReportRow> filtered = new ArrayList<>();
+
+        for (com.mycompany.perpustakaan.api.InventoryReportRow row : rows) {
+            String haystack = (safeOrDash(row.getKodeBuku()) + " "
+                    + safeOrDash(row.getJudul()) + " "
+                    + safeOrDash(row.getPenulis()) + " "
+                    + safeOrDash(row.getKategori())).toLowerCase();
+
+            if (haystack.contains(q)) {
+                filtered.add(row);
+            }
+        }
+
+        return filtered;
+    }
+
+    private void createCategoryMaster() {
+        String name = JOptionPane.showInputDialog(
+                this,
+                "Nama kategori baru:",
+                "Tambah Kategori",
+                JOptionPane.PLAIN_MESSAGE);
+
+        if (name == null) {
+            return;
+        }
+
+        name = name.trim();
+
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Nama kategori wajib diisi", "Validasi", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            Object response = invokeApi("createCategory", new Class<?>[] { String.class }, name);
+
+            boolean success = response == null || pageBool(response, "isSuccess", true);
+
+            String message = readMessage(
+                    response,
+                    success ? "Kategori berhasil ditambahkan" : "Gagal menambahkan kategori");
+
+            showResponse(success, message);
+
+            if (success) {
+                showCategoryManagement();
+            }
+
+        } catch (SQLException e) {
+            showError("Gagal menambahkan kategori", e);
+        }
+    }
+
+    private String readMessage(Object response, String fallback) {
+        if (response == null) {
+            return fallback;
+        }
+
+        try {
+            Object message = response.getClass().getMethod("getMessage").invoke(response);
+            return message == null ? fallback : String.valueOf(message);
+
+        } catch (ReflectiveOperationException ignored) {
+            return fallback;
+        }
+    }
+
+    private void exportVisit(String format, String keyword, String status) {
+        String dir = chooseDirectory();
+
+        if (dir == null) {
+            return;
+        }
+
+        try {
+            Object response = invokeApi(
+                    "exportVisitReport",
+                    new Class<?>[] { String.class, String.class, String.class, String.class },
+                    format,
+                    dir,
+                    keyword,
+                    status);
+
+            if (response == null) {
+                response = invokeApi(
+                        "exportVisitReport",
+                        new Class<?>[] { String.class, String.class },
+                        format,
+                        dir);
+            }
+
+            if (response == null) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Method exportVisitReport belum tersedia / cocok di LibraryApi FE.",
+                        "Export Kunjungan",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            boolean success = pageBool(response, "isSuccess", true);
+            String filePath = readMessageProperty(response, "getFilePath");
+
+            showResponse(
+                    success,
+                    readMessage(response, success ? "Export kunjungan berhasil" : "Export kunjungan gagal")
+                            + (filePath == null ? "" : "\n" + filePath));
+
+        } catch (SQLException e) {
+            showError("Gagal export laporan kunjungan", e);
+        }
+    }
+
+    private String readMessageProperty(Object response, String getter) {
+        if (response == null) {
+            return null;
+        }
+
+        try {
+            Object value = response.getClass().getMethod(getter).invoke(response);
+            return value == null ? null : String.valueOf(value);
+
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private String chooseDirectory() {
+        JFileChooser chooser = new JFileChooser(new File(System.getProperty("user.home"), "Documents"));
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+
+        int result = chooser.showSaveDialog(this);
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+            return chooser.getSelectedFile().getAbsolutePath();
+        }
+
+        return null;
     }
 
     private int calculateTotalPages(int totalItems, int pageSize) {
         if (totalItems <= 0 || pageSize <= 0) {
             return 0;
         }
+
         return (int) Math.ceil((double) totalItems / pageSize);
+    }
+
+    private LocalDate parseDate(String value) {
+        return LocalDate.parse(value.trim());
     }
 
     private String truncate(String text, int maxLength) {
