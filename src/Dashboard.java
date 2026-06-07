@@ -4510,7 +4510,20 @@ public class Dashboard extends JFrame {
                         .append("\n")
                         .append(notification.getPesan());
             }
-            JOptionPane.showMessageDialog(this, message.toString(), "Notifikasi", JOptionPane.INFORMATION_MESSAGE);
+            Object[] options = { "Tutup", "Tandai Dibaca" };
+            int choice = JOptionPane.showOptionDialog(
+                    this,
+                    message.toString(),
+                    "Notifikasi",
+                    JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.INFORMATION_MESSAGE,
+                    null,
+                    options,
+                    options[0]);
+            if (choice == 1) {
+                com.mycompany.perpustakaan.api.MemberResponse response = libraryApi.markAllNotificationsRead();
+                showResponse(response.isSuccess(), response.getMessage());
+            }
         } catch (SQLException | IllegalStateException e) {
             showError("Gagal memuat notifikasi", e);
         }
@@ -4930,15 +4943,112 @@ public class Dashboard extends JFrame {
         panel.add(Box.createVerticalStrut(18));
 
         JLabel note = new JLabel("<html><div style='width:520px;'>"
-                + "Profil ini mengikuti data akun yang sedang login. Untuk perubahan data akun, gunakan fitur manajemen user/member sesuai role."
+                + "Username, role, dan status akun tetap dikunci agar identitas login tidak berubah sembarangan."
                 + "</div></html>");
         note.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         note.setForeground(TEXT_GRAY);
         note.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         panel.add(note);
+        panel.add(Box.createVerticalStrut(14));
+
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        actions.setOpaque(false);
+        actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JButton editProfile = createActionButton("Edit Profil");
+        JButton changePassword = createNeutralButton("Ganti Password");
+        editProfile.addActionListener(e -> showEditProfileDialog(profile));
+        changePassword.addActionListener(e -> showChangePasswordDialog());
+
+        actions.add(editProfile);
+        actions.add(changePassword);
+        panel.add(actions);
 
         return panel;
+    }
+
+    private void showEditProfileDialog(com.mycompany.perpustakaan.api.UserSummary profile) {
+        JTextField nama = createField(safe(profile.getNama()));
+        JTextField email = createField(safe(profile.getEmail()));
+        nama.setPreferredSize(new Dimension(260, 34));
+        email.setPreferredSize(new Dimension(260, 34));
+
+        JPanel form = formPanel(new String[] { "Nama Lengkap", "Email" }, new JTextField[] { nama, email });
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                form,
+                "Edit Profil",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+
+        if (result != JOptionPane.OK_OPTION) {
+            return;
+        }
+
+        try {
+            com.mycompany.perpustakaan.api.ProfileRequest request =
+                    new com.mycompany.perpustakaan.api.ProfileRequest(nama.getText().trim(), blankToNull(email.getText()));
+            com.mycompany.perpustakaan.api.MemberResponse response = libraryApi.updateCurrentProfile(request);
+            showResponse(response.isSuccess(), response.getMessage());
+            if (response.isSuccess()) {
+                loadUserData();
+                showProfile();
+            }
+        } catch (SQLException exception) {
+            showError("Gagal update profil", exception);
+        }
+    }
+
+    private void showChangePasswordDialog() {
+        javax.swing.JPasswordField oldPassword = new javax.swing.JPasswordField();
+        javax.swing.JPasswordField newPassword = new javax.swing.JPasswordField();
+        javax.swing.JPasswordField confirmPassword = new javax.swing.JPasswordField();
+        oldPassword.setPreferredSize(new Dimension(260, 34));
+        newPassword.setPreferredSize(new Dimension(260, 34));
+        confirmPassword.setPreferredSize(new Dimension(260, 34));
+
+        JPanel form = new JPanel(new GridLayout(3, 2, 10, 8));
+        form.setBorder(new EmptyBorder(8, 8, 8, 8));
+        form.setOpaque(false);
+        form.add(new JLabel("Password Lama"));
+        form.add(oldPassword);
+        form.add(new JLabel("Password Baru"));
+        form.add(newPassword);
+        form.add(new JLabel("Konfirmasi"));
+        form.add(confirmPassword);
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                form,
+                "Ganti Password",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+
+        if (result != JOptionPane.OK_OPTION) {
+            return;
+        }
+
+        String oldValue = new String(oldPassword.getPassword());
+        String newValue = new String(newPassword.getPassword());
+        String confirmValue = new String(confirmPassword.getPassword());
+
+        if (oldValue.isBlank() || newValue.isBlank() || confirmValue.isBlank()) {
+            JOptionPane.showMessageDialog(this, "Semua field password wajib diisi.", "Validasi", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (!newValue.equals(confirmValue)) {
+            JOptionPane.showMessageDialog(this, "Konfirmasi password baru tidak cocok.", "Validasi", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            com.mycompany.perpustakaan.api.MemberResponse response =
+                    libraryApi.changeCurrentPassword(oldValue, newValue);
+            showResponse(response.isSuccess(), response.getMessage());
+        } catch (SQLException exception) {
+            showError("Gagal mengganti password", exception);
+        }
     }
 
     private JPanel createProfileInfoItem(String labelText, String valueText) {
