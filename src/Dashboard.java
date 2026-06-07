@@ -2424,9 +2424,24 @@ public class Dashboard extends JFrame {
         card.add(Box.createVerticalStrut(24));
 
         JTextField nama = createModernVisitField("");
-        JTextField jenis = createModernVisitField("mahasiswa");
+        JComboBox<String> jenis = createModernVisitComboBox(new String[] {
+                "mahasiswa",
+                "pelajar",
+                "dosen",
+                "staff",
+                "umum",
+                "tamu"
+        });
         JTextField asal = createModernVisitField("");
-        JTextField keperluan = createModernVisitField("Membaca buku");
+        JComboBox<String> keperluan = createModernVisitComboBox(new String[] {
+                "Membaca buku",
+                "Meminjam buku",
+                "Mengembalikan buku",
+                "Mengerjakan tugas",
+                "Riset / referensi",
+                "Kunjungan umum"
+        });
+        keperluan.setEditable(true);
 
         if (staffMode) {
             card.add(createModernFormRow("Nama Pengunjung", nama));
@@ -2484,7 +2499,20 @@ public class Dashboard extends JFrame {
         return field;
     }
 
-    private JPanel createModernFormRow(String labelText, JTextField field) {
+    private JComboBox<String> createModernVisitComboBox(String[] options) {
+        JComboBox<String> comboBox = new JComboBox<>(options);
+        comboBox.setPreferredSize(new Dimension(360, 38));
+        comboBox.setMaximumSize(new Dimension(360, 38));
+        comboBox.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        comboBox.setForeground(TEXT_DARK);
+        comboBox.setBackground(WHITE);
+        comboBox.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(CARD_BORDER),
+                new EmptyBorder(4, 10, 4, 10)));
+        return comboBox;
+    }
+
+    private JPanel createModernFormRow(String labelText, Component field) {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 0));
         row.setOpaque(false);
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -2501,8 +2529,10 @@ public class Dashboard extends JFrame {
         return row;
     }
 
-    private void saveMemberVisit(JTextField jenis, JTextField asal, JTextField keperluan) {
-        if (jenis.getText().trim().isEmpty() || keperluan.getText().trim().isEmpty()) {
+    private void saveMemberVisit(JComboBox<String> jenis, JTextField asal, JComboBox<String> keperluan) {
+        String selectedJenis = comboValue(jenis);
+        String selectedKeperluan = comboValue(keperluan);
+        if (selectedJenis.isEmpty() || selectedKeperluan.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Jenis pengunjung dan keperluan wajib diisi.", "Validasi",
                     JOptionPane.WARNING_MESSAGE);
             return;
@@ -2510,9 +2540,9 @@ public class Dashboard extends JFrame {
 
         try {
             com.mycompany.perpustakaan.api.VisitResponse response = libraryApi.addRegisteredUserVisit(
-                    jenis.getText().trim(),
+                    selectedJenis,
                     asal.getText().trim(),
-                    keperluan.getText().trim());
+                    selectedKeperluan);
 
             showResponse(response.isSuccess(), response.getMessage());
 
@@ -2524,10 +2554,12 @@ public class Dashboard extends JFrame {
         }
     }
 
-    private void saveStaffVisit(JTextField nama, JTextField jenis, JTextField asal, JTextField keperluan) {
+    private void saveStaffVisit(JTextField nama, JComboBox<String> jenis, JTextField asal, JComboBox<String> keperluan) {
+        String selectedJenis = comboValue(jenis);
+        String selectedKeperluan = comboValue(keperluan);
         if (nama.getText().trim().isEmpty()
-                || jenis.getText().trim().isEmpty()
-                || keperluan.getText().trim().isEmpty()) {
+                || selectedJenis.isEmpty()
+                || selectedKeperluan.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Nama, jenis pengunjung, dan keperluan wajib diisi.", "Validasi",
                     JOptionPane.WARNING_MESSAGE);
             return;
@@ -2536,9 +2568,9 @@ public class Dashboard extends JFrame {
         try {
             com.mycompany.perpustakaan.api.VisitResponse response = libraryApi.addManualVisit(
                     nama.getText().trim(),
-                    jenis.getText().trim(),
+                    selectedJenis,
                     asal.getText().trim(),
-                    keperluan.getText().trim());
+                    selectedKeperluan);
 
             showResponse(response.isSuccess(), response.getMessage());
 
@@ -2756,7 +2788,7 @@ public class Dashboard extends JFrame {
         JTextField judul = createModernBookField("");
         JTextField penulis = createModernBookField("");
         JTextField penerbit = createModernBookField("");
-        JTextField kategori = createModernBookField("");
+        JComboBox<String> kategori = createModernBookComboBox(loadBookCategoryOptions());
         JTextField tahun = createModernBookField("");
         JTextField stokTersedia = createModernBookField("1");
         JTextField stokTotal = createModernBookField("1");
@@ -2769,7 +2801,7 @@ public class Dashboard extends JFrame {
                 judul.setText(safe(book.getJudul()));
                 penulis.setText(safe(book.getPenulis()));
                 penerbit.setText(safe(book.getPenerbit()));
-                kategori.setText(safe(book.getKategori()));
+                selectComboValue(kategori, safe(book.getKategori()));
                 tahun.setText(book.getTahunTerbit() == null ? "" : String.valueOf(book.getTahunTerbit()));
                 stokTersedia.setText(String.valueOf(book.getStokTersedia()));
                 stokTotal.setText(String.valueOf(book.getStokTotal()));
@@ -2815,7 +2847,7 @@ public class Dashboard extends JFrame {
             JTextField judul,
             JTextField penulis,
             JTextField penerbit,
-            JTextField kategori,
+            JComboBox<String> kategori,
             JTextField tahun,
             JTextField stokTersedia,
             JTextField stokTotal) {
@@ -2885,7 +2917,7 @@ public class Dashboard extends JFrame {
                 if (kode.getText().trim().isEmpty()
                         || judul.getText().trim().isEmpty()
                         || penulis.getText().trim().isEmpty()
-                        || kategori.getText().trim().isEmpty()) {
+                        || comboValue(kategori).isEmpty()) {
                     JOptionPane.showMessageDialog(
                             this,
                             "Kode, judul, penulis, dan kategori wajib diisi.",
@@ -2915,7 +2947,7 @@ public class Dashboard extends JFrame {
                         judul.getText().trim(),
                         penulis.getText().trim(),
                         penerbit.getText().trim(),
-                        kategori.getText().trim(),
+                        comboValue(kategori),
                         tahunValue,
                         stokTersediaValue,
                         stokTotalValue);
@@ -2943,7 +2975,7 @@ public class Dashboard extends JFrame {
         return card;
     }
 
-    private JPanel createModernBookInput(String labelText, JTextField field) {
+    private JPanel createModernBookInput(String labelText, Component field) {
         JPanel box = new JPanel();
         box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
         box.setOpaque(false);
@@ -2953,7 +2985,9 @@ public class Dashboard extends JFrame {
         label.setForeground(TEXT_DARK);
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        field.setAlignmentX(Component.LEFT_ALIGNMENT);
+        if (field instanceof javax.swing.JComponent) {
+            ((javax.swing.JComponent) field).setAlignmentX(Component.LEFT_ALIGNMENT);
+        }
 
         box.add(label);
         box.add(Box.createVerticalStrut(7));
@@ -2990,6 +3024,71 @@ public class Dashboard extends JFrame {
         field.setBorder(new EmptyBorder(9, 13, 9, 13));
 
         return field;
+    }
+
+    private JComboBox<String> createModernBookComboBox(String[] options) {
+        JComboBox<String> comboBox = new JComboBox<>(options);
+        comboBox.setPreferredSize(new Dimension(360, 40));
+        comboBox.setMaximumSize(new Dimension(360, 40));
+        comboBox.setMinimumSize(new Dimension(220, 40));
+        comboBox.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        comboBox.setForeground(TEXT_DARK);
+        comboBox.setBackground(WHITE);
+        comboBox.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(CARD_BORDER),
+                new EmptyBorder(4, 10, 4, 10)));
+        return comboBox;
+    }
+
+    private String[] loadBookCategoryOptions() {
+        java.util.ArrayList<String> options = new java.util.ArrayList<>();
+        try {
+            for (String category : libraryApi.getBookCategories()) {
+                if (category != null && !category.isBlank() && !options.contains(category)) {
+                    options.add(category);
+                }
+            }
+        } catch (SQLException exception) {
+            logger.log(java.util.logging.Level.WARNING, "Gagal memuat kategori buku", exception);
+        }
+
+        if (options.isEmpty()) {
+            options.add("Teknologi Informasi");
+            options.add("Ekonomi");
+            options.add("Kesehatan");
+            options.add("Hukum");
+            options.add("Bahasa & Sastra");
+            options.add("Filsafat");
+            options.add("Sains & Riset");
+            options.add("Manajemen");
+        }
+
+        return options.toArray(new String[0]);
+    }
+
+    private void selectComboValue(JComboBox<String> comboBox, String value) {
+        if (comboBox == null || value == null || value.isBlank()) {
+            return;
+        }
+
+        for (int i = 0; i < comboBox.getItemCount(); i++) {
+            if (value.equalsIgnoreCase(comboBox.getItemAt(i))) {
+                comboBox.setSelectedIndex(i);
+                return;
+            }
+        }
+
+        comboBox.addItem(value);
+        comboBox.setSelectedItem(value);
+    }
+
+    private String comboValue(JComboBox<String> comboBox) {
+        if (comboBox == null) {
+            return "";
+        }
+
+        Object selected = comboBox.getSelectedItem();
+        return selected == null ? "" : selected.toString().trim();
     }
 
     private JPanel createModernBookCoverPanel(String labelText, int width, int height) {
