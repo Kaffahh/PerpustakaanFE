@@ -965,6 +965,10 @@ public class Dashboard extends JFrame {
         JComboBox<String> status = new JComboBox<>(new String[] { "semua", "datang", "selesai", "batal" });
         status.setPreferredSize(new Dimension(150, 38));
         status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JTextField startDate = createField(LocalDate.now().minusMonths(1).toString());
+        startDate.setPreferredSize(new Dimension(130, 38));
+        JTextField endDate = createField(LocalDate.now().toString());
+        endDate.setPreferredSize(new Dimension(130, 38));
 
         JButton load = createActionButton("Tampilkan");
         JButton pdf = createActionButton("Export PDF");
@@ -974,6 +978,10 @@ public class Dashboard extends JFrame {
         toolbar.add(search);
         toolbar.add(new JLabel("Status"));
         toolbar.add(status);
+        toolbar.add(new JLabel("Dari"));
+        toolbar.add(startDate);
+        toolbar.add(new JLabel("Sampai"));
+        toolbar.add(endDate);
         toolbar.add(load);
         toolbar.add(pdf);
         toolbar.add(xlsx);
@@ -994,6 +1002,8 @@ public class Dashboard extends JFrame {
                 String selectedStatus = status.getSelectedItem() == null
                         ? "semua"
                         : status.getSelectedItem().toString();
+                LocalDate reportStart = parseDateSafe(startDate.getText());
+                LocalDate reportEnd = parseDateSafe(endDate.getText());
 
                 DefaultTableModel model = new DefaultTableModel(
                         new Object[] { "ID", "Nama", "Jenis", "Asal", "Keperluan", "Status", "Tanggal" },
@@ -1484,11 +1494,19 @@ public class Dashboard extends JFrame {
         JTextField search = createModernSearchField("Cari user / buku / kode...");
         JComboBox<String> status = new JComboBox<>(
                 new String[] { "semua", "aktif", "dipinjam", "terlambat", "dikembalikan" });
+        JTextField loanStartDate = createField(LocalDate.now().minusMonths(1).toString());
+        loanStartDate.setPreferredSize(new Dimension(130, 38));
+        JTextField loanEndDate = createField(LocalDate.now().toString());
+        loanEndDate.setPreferredSize(new Dimension(130, 38));
         JButton load = createActionButton("Tampilkan");
         actions.add(create);
         actions.add(search);
         actions.add(new JLabel("Status"));
         actions.add(status);
+        actions.add(new JLabel("Dari"));
+        actions.add(loanStartDate);
+        actions.add(new JLabel("Sampai"));
+        actions.add(loanEndDate);
         actions.add(load);
         contentPanel.add(actions);
         contentPanel.add(Box.createVerticalStrut(15));
@@ -1503,8 +1521,10 @@ public class Dashboard extends JFrame {
             tableHolder.removeAll();
             try {
                 String keyword = searchText(search, "Cari user / buku / kode...");
+                LocalDate loanStart = parseDateSafe(loanStartDate.getText());
+                LocalDate loanEnd = parseDateSafe(loanEndDate.getText());
                 com.mycompany.perpustakaan.api.LoanManagementPage page = libraryApi
-                        .searchLoansForManagement((String) status.getSelectedItem(), keyword, currentPage[0], pageSize);
+                        .searchLoansForManagement((String) status.getSelectedItem(), keyword, loanStart, loanEnd, currentPage[0], pageSize);
                 DefaultTableModel model = new DefaultTableModel(
                         new Object[] { "ID", "Buku", "Pinjam", "Jatuh Tempo", "Kembali", "Status", "Denda" }, 0);
                 for (com.mycompany.perpustakaan.api.LoanSummary loan : page.getLoans()) {
