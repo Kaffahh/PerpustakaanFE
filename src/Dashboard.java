@@ -2672,6 +2672,10 @@ public class Dashboard extends JFrame {
         JComboBox<String> status = new JComboBox<>(new String[] { "semua", "datang", "selesai", "batal" });
         status.setPreferredSize(new Dimension(150, 38));
         status.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        JTextField startDate = createField(LocalDate.now().minusMonths(1).toString());
+        startDate.setPreferredSize(new Dimension(130, 38));
+        JTextField endDate = createField(LocalDate.now().toString());
+        endDate.setPreferredSize(new Dimension(130, 38));
         JButton load = createActionButton("Tampilkan");
         JButton tambahKunjungan = createActionButton("Tambah Kunjungan");
         JButton refresh = createNeutralButton("Refresh");
@@ -2682,6 +2686,10 @@ public class Dashboard extends JFrame {
         actions.add(search);
         actions.add(new JLabel("Status"));
         actions.add(status);
+        actions.add(new JLabel("Dari"));
+        actions.add(startDate);
+        actions.add(new JLabel("Sampai"));
+        actions.add(endDate);
         actions.add(load);
         actions.add(tambahKunjungan);
         actions.add(refresh);
@@ -2705,13 +2713,15 @@ public class Dashboard extends JFrame {
                 String keyword = searchText(search, "Cari pengunjung / asal / keperluan...");
                 String selectedStatus = status.getSelectedItem() == null ? "semua"
                         : status.getSelectedItem().toString();
-                int totalItems = libraryApi.countVisits(keyword, selectedStatus);
+                LocalDate visitStartDate = parseDateSafe(startDate.getText());
+                LocalDate visitEndDate = parseDateSafe(endDate.getText());
+                int totalItems = libraryApi.countVisits(keyword, selectedStatus, visitStartDate, visitEndDate);
                 int totalPages = calculateTotalPages(totalItems, pageSize);
                 if (totalPages > 0 && currentPage[0] > totalPages) {
                     currentPage[0] = totalPages;
                 }
                 List<com.mycompany.perpustakaan.api.VisitSummary> visits = libraryApi.searchVisits(keyword,
-                        selectedStatus, currentPage[0], pageSize);
+                        selectedStatus, visitStartDate, visitEndDate, currentPage[0], pageSize);
                 JTable table = createTable(createVisitManagementTableModel(visits));
                 tableHolder.add(wrapTable(table, 420));
                 JPanel visitActions = createVisitManagementActions(table);
@@ -6056,6 +6066,17 @@ public class Dashboard extends JFrame {
 
     private LocalDate parseDate(String value) {
         return LocalDate.parse(value.trim());
+    }
+
+    private LocalDate parseDateSafe(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     private String truncate(String text, int maxLength) {
