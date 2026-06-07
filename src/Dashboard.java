@@ -29,17 +29,21 @@ import javax.swing.ButtonModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.AbstractCellEditor;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.SwingUtilities;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 
 public class Dashboard extends JFrame {
@@ -1236,18 +1240,25 @@ public class Dashboard extends JFrame {
                 tableHolder.add(wrapTable(table, 520));
 
                 JPanel actions = createToolbarPanel();
-                JButton update = createActionButton("Update");
-                JButton suspend = createActionButton("Suspend");
-                JButton activate = createActionButton("Aktifkan");
-                JButton delete = createDangerButton("Hapus");
-                update.addActionListener(e -> updateSelectedMember(table));
-                suspend.addActionListener(e -> changeSelectedMemberStatus(table, true));
-                activate.addActionListener(e -> changeSelectedMemberStatus(table, false));
-                delete.addActionListener(e -> deleteSelectedMember(table));
-                actions.add(update);
-                actions.add(suspend);
-                actions.add(activate);
-                actions.add(delete);
+                if (isAdmin()) {
+                    JButton update = createActionButton("Update");
+                    JButton suspend = createActionButton("Suspend");
+                    JButton activate = createActionButton("Aktifkan");
+                    JButton delete = createDangerButton("Hapus");
+                    update.addActionListener(e -> updateSelectedMember(table));
+                    suspend.addActionListener(e -> changeSelectedMemberStatus(table, true));
+                    activate.addActionListener(e -> changeSelectedMemberStatus(table, false));
+                    delete.addActionListener(e -> deleteSelectedMember(table));
+                    actions.add(update);
+                    actions.add(suspend);
+                    actions.add(activate);
+                    actions.add(delete);
+                } else {
+                    JLabel readOnlyHint = new JLabel("Mode staff: data member hanya bisa dilihat. Perubahan member khusus admin.");
+                    readOnlyHint.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                    readOnlyHint.setForeground(TEXT_GRAY);
+                    actions.add(readOnlyHint);
+                }
                 actionHolder.add(actions);
                 refreshContent();
             } catch (SQLException e) {
@@ -1265,7 +1276,9 @@ public class Dashboard extends JFrame {
             status.setSelectedItem("semua");
             render[0].run();
         });
-        addButton.addActionListener(e -> showAddMemberDialog());
+        if (addButton != null) {
+            addButton.addActionListener(e -> showAddMemberDialog());
+        }
         search.addActionListener(e -> render[0].run());
         status.addActionListener(e -> render[0].run());
 
@@ -1281,18 +1294,20 @@ public class Dashboard extends JFrame {
         JPanel toolbar = createToolbarPanel();
         JButton searchButton = createActionButton("Cari");
         JButton refreshButton = createNeutralButton("Refresh");
-        JButton addButton = createActionButton("Tambah Anggota");
 
         toolbar.add(search);
         toolbar.add(new JLabel("Status"));
         toolbar.add(status);
         toolbar.add(searchButton);
         toolbar.add(refreshButton);
-        toolbar.add(addButton);
+        if (isAdmin()) {
+            JButton addButton = createActionButton("Tambah Anggota");
+            toolbar.add(addButton);
+            toolbar.putClientProperty("addButton", addButton);
+        }
 
         toolbar.putClientProperty("searchButton", searchButton);
         toolbar.putClientProperty("refreshButton", refreshButton);
-        toolbar.putClientProperty("addButton", addButton);
         return toolbar;
     }
 
@@ -1326,81 +1341,171 @@ public class Dashboard extends JFrame {
         addQuickActions(new String[] { "Refresh" }, new Runnable[] { this::showPendingLoanRequests });
         try {
             List<com.mycompany.perpustakaan.api.LoanSummary> pendingLoans = libraryApi.getPendingLoanRequests();
-            DefaultTableModel model = new DefaultTableModel(
-                    new Object[] { "ID", "Peminjam", "Username", "Buku", "Tanggal Request", "Jatuh Tempo", "Status" },
-                    0);
-            for (com.mycompany.perpustakaan.api.LoanSummary loan : pendingLoans) {
-                String namaPeminjam = loan.getNamaUser();
-                if (namaPeminjam == null || namaPeminjam.isBlank()) {
-                    namaPeminjam = "-";
-                }
-                String username = loan.getUsernameUser();
-                if (username == null || username.isBlank()) {
-                    username = "-";
-                }
-                model.addRow(new Object[] {
-                        loan.getIdPeminjaman(),
-                        namaPeminjam,
-                        username,
-                        loan.getJudulBuku(),
-                        loan.getTanggalPinjam(),
-                        loan.getTanggalJatuhTempo(),
-                        loan.getStatus()
-                });
-            }
+            DefaultTableModel model = createPendingLoanTableModel(pendingLoans);
             JTable table = createTable(model);
+            installPendingLoanActionColumn(table);
             contentPanel.add(wrapTable(table, 480));
-
-            JPanel actions = createToolbarPanel();
-            JButton approve = createActionButton("Setujui");
-            approve.setBackground(GREEN_STATUS);
-            JButton reject = createActionButton("Tolak");
-            reject.setBackground(RED_STATUS);
-            actions.add(approve);
-            actions.add(reject);
-            contentPanel.add(actions);
-
-            approve.addActionListener(e -> approveSelectedPendingLoan(table));
-            reject.addActionListener(e -> rejectSelectedPendingLoan(table));
         } catch (SQLException e) {
             showError("Gagal memuat pending loan requests", e);
         }
         refreshContent();
     }
 
-    private void approveSelectedPendingLoan(JTable table) {
-        Integer id = selectedId(table);
-        if (id == null) {
-            return;
-        }
-        int confirm = JOptionPane.showConfirmDialog(this, "Setujui peminjaman ID " + id + "?", "Konfirmasi",
-                JOptionPane.YES_NO_OPTION);
-        if (confirm == JOptionPane.YES_OPTION) {
-            try {
-                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.approveLoanRequest(id);
-                showResponse(response.isSuccess(), response.getMessage());
-                showPendingLoanRequests();
-            } catch (SQLException e) {
-                showError("Gagal menyetujui peminjaman", e);
+    private DefaultTableModel createPendingLoanTableModel(List<com.mycompany.perpustakaan.api.LoanSummary> pendingLoans) {
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[] { "ID", "Peminjam", "Username", "Buku", "Tanggal Request", "Jatuh Tempo", "Status", "Aksi" },
+                0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 7 && isValidTableId(getValueAt(row, 0));
             }
+        };
+
+        if (pendingLoans == null || pendingLoans.isEmpty()) {
+            model.addRow(new Object[] { "-", "Belum ada pending request", "-", "-", "-", "-", "-", "" });
+            return model;
+        }
+
+        for (com.mycompany.perpustakaan.api.LoanSummary loan : pendingLoans) {
+            String namaPeminjam = loan.getNamaUser();
+            if (namaPeminjam == null || namaPeminjam.isBlank()) {
+                namaPeminjam = "-";
+            }
+            String username = loan.getUsernameUser();
+            if (username == null || username.isBlank()) {
+                username = "-";
+            }
+            model.addRow(new Object[] {
+                    loan.getIdPeminjaman(),
+                    namaPeminjam,
+                    username,
+                    loan.getJudulBuku(),
+                    loan.getTanggalPinjam(),
+                    loan.getTanggalJatuhTempo(),
+                    loan.getStatus(),
+                    ""
+            });
+        }
+        return model;
+    }
+
+    private void installPendingLoanActionColumn(JTable table) {
+        int actionColumn = 7;
+        table.getColumnModel().getColumn(actionColumn).setPreferredWidth(170);
+        table.getColumnModel().getColumn(actionColumn).setMinWidth(150);
+        table.getColumnModel().getColumn(actionColumn).setCellRenderer(new PendingLoanActionCell(false));
+        table.getColumnModel().getColumn(actionColumn).setCellEditor(new PendingLoanActionCell(true));
+    }
+
+    private class PendingLoanActionCell extends AbstractCellEditor implements TableCellRenderer, TableCellEditor {
+        private final JPanel panel;
+        private final JButton approve;
+        private final JButton reject;
+        private JTable table;
+        private int modelRow = -1;
+
+        PendingLoanActionCell(boolean editable) {
+            panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 3));
+            panel.setOpaque(true);
+
+            approve = createInlineDecisionButton("Setujui", GREEN_STATUS);
+            reject = createInlineDecisionButton("Tolak", RED_STATUS);
+            panel.add(approve);
+            panel.add(reject);
+
+            if (editable) {
+                approve.addActionListener(e -> handlePendingLoanDecision(true));
+                reject.addActionListener(e -> handlePendingLoanDecision(false));
+            }
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
+                boolean hasFocus, int row, int column) {
+            int currentModelRow = table.convertRowIndexToModel(row);
+            boolean valid = isValidTableId(table.getModel().getValueAt(currentModelRow, 0));
+            configurePanel(table, isSelected, valid);
+            return panel;
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row,
+                int column) {
+            this.table = table;
+            this.modelRow = table.convertRowIndexToModel(row);
+            boolean valid = isValidTableId(table.getModel().getValueAt(modelRow, 0));
+            configurePanel(table, true, valid);
+            return panel;
+        }
+
+        @Override
+        public Object getCellEditorValue() {
+            return "";
+        }
+
+        private void configurePanel(JTable table, boolean selected, boolean valid) {
+            panel.setBackground(selected ? table.getSelectionBackground() : table.getBackground());
+            approve.setVisible(valid);
+            reject.setVisible(valid);
+        }
+
+        private void handlePendingLoanDecision(boolean approveRequest) {
+            if (table == null || modelRow < 0) {
+                return;
+            }
+            Object value = table.getModel().getValueAt(modelRow, 0);
+            if (!isValidTableId(value)) {
+                return;
+            }
+            int id = Integer.parseInt(String.valueOf(value));
+            String borrowerName = safeOrDash(String.valueOf(table.getModel().getValueAt(modelRow, 1)));
+            stopCellEditing();
+            SwingUtilities.invokeLater(() -> processPendingLoanDecision(id, borrowerName, approveRequest));
         }
     }
 
-    private void rejectSelectedPendingLoan(JTable table) {
-        Integer id = selectedId(table);
-        if (id == null) {
+    private JButton createInlineDecisionButton(String text, Color color) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        button.setForeground(WHITE);
+        button.setBackground(color);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setPreferredSize(new Dimension(72, 28));
+        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        return button;
+    }
+
+    private boolean isValidTableId(Object value) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            Integer.parseInt(String.valueOf(value));
+            return true;
+        } catch (NumberFormatException exception) {
+            return false;
+        }
+    }
+
+    private void processPendingLoanDecision(int id, String borrowerName, boolean approveRequest) {
+        String action = approveRequest ? "Setujui" : "Tolak";
+        int confirm = JOptionPane.showConfirmDialog(this, action + " peminjaman dari " + safeOrDash(borrowerName) + "?",
+                "Konfirmasi", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) {
             return;
         }
-        int confirm = JOptionPane.showConfirmDialog(this, "Tolak peminjaman ID " + id + "?", "Konfirmasi",
-                JOptionPane.YES_NO_OPTION);
-        if (confirm == JOptionPane.YES_OPTION) {
-            try {
-                com.mycompany.perpustakaan.api.LoanResponse response = libraryApi.rejectLoanRequest(id);
-                showResponse(response.isSuccess(), response.getMessage());
+
+        try {
+            com.mycompany.perpustakaan.api.LoanResponse response = approveRequest
+                    ? libraryApi.approveLoanRequest(id)
+                    : libraryApi.rejectLoanRequest(id);
+            showResponse(response.isSuccess(), response.getMessage());
+            if (response.isSuccess()) {
                 showPendingLoanRequests();
-            } catch (SQLException e) {
-                showError("Gagal menolak peminjaman", e);
             }
+        } catch (SQLException e) {
+            showError(approveRequest ? "Gagal menyetujui peminjaman" : "Gagal menolak peminjaman", e);
         }
     }
 
