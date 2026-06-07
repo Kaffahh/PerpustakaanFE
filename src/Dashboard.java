@@ -1896,6 +1896,16 @@ public class Dashboard extends JFrame {
         resetContent();
         addTitle("Pending Loan Requests");
 
+        JPanel toolbar = createToolbarPanel();
+        JTextField search = createModernSearchField("Cari peminjam / username / buku...");
+        JButton load = createActionButton("Tampilkan");
+        JButton reset = createNeutralButton("Reset");
+        toolbar.add(search);
+        toolbar.add(load);
+        toolbar.add(reset);
+        contentPanel.add(toolbar);
+        contentPanel.add(Box.createVerticalStrut(12));
+
         JPanel tableHolder = createDynamicContentPanel();
         contentPanel.add(tableHolder);
 
@@ -1908,9 +1918,11 @@ public class Dashboard extends JFrame {
             tableHolder.removeAll();
 
             try {
+                String keyword = searchText(search, "Cari peminjam / username / buku...");
                 Object page = invokeApi(
                         "getPendingLoanRequests",
-                        new Class<?>[] { int.class, int.class },
+                        new Class<?>[] { String.class, int.class, int.class },
+                        keyword,
                         currentPage[0],
                         pageSize);
 
@@ -1923,6 +1935,7 @@ public class Dashboard extends JFrame {
 
                 if (pendingLoans == null) {
                     pendingLoans = libraryApi.getPendingLoanRequests();
+                    pendingLoans = filterPendingLoans(pendingLoans, keyword);
                     pendingLoans = slice(pendingLoans, currentPage[0], pageSize);
                 }
 
@@ -1944,8 +1957,44 @@ public class Dashboard extends JFrame {
             }
         };
 
+        search.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        load.addActionListener(e -> {
+            currentPage[0] = 1;
+            render[0].run();
+        });
+        reset.addActionListener(e -> {
+            search.setText("Cari peminjam / username / buku...");
+            search.setForeground(TEXT_GRAY);
+            currentPage[0] = 1;
+            render[0].run();
+        });
+
         render[0].run();
         refreshContent();
+    }
+
+    private List<com.mycompany.perpustakaan.api.LoanSummary> filterPendingLoans(
+            List<com.mycompany.perpustakaan.api.LoanSummary> loans,
+            String keyword) {
+        if (loans == null || keyword == null || keyword.isBlank()) {
+            return loans;
+        }
+
+        String q = keyword.trim().toLowerCase();
+        java.util.ArrayList<com.mycompany.perpustakaan.api.LoanSummary> filtered = new java.util.ArrayList<>();
+        for (com.mycompany.perpustakaan.api.LoanSummary loan : loans) {
+            String haystack = (safeOrDash(loan.getNamaUser()) + " "
+                    + safeOrDash(loan.getUsernameUser()) + " "
+                    + safeOrDash(loan.getJudulBuku()) + " "
+                    + safeOrDash(loan.getStatus())).toLowerCase();
+            if (haystack.contains(q)) {
+                filtered.add(loan);
+            }
+        }
+        return filtered;
     }
 
     private DefaultTableModel createPendingLoanTableModel(
