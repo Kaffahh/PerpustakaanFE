@@ -1662,7 +1662,7 @@ public class Dashboard extends JFrame {
                 next.setEnabled(totalPages > 0 && currentPage[0] < totalPages);
                 prev.addActionListener(e -> {
                     currentPage[0] = Math.max(1, currentPage[0] - 1);
-                    render[0].run();9
+                    render[0].run();
                 });
                 next.addActionListener(e -> {
                     currentPage[0]++;
@@ -4596,6 +4596,10 @@ public class Dashboard extends JFrame {
     }
 
     private JButton createNotificationButton() {
+        if (System.currentTimeMillis() >= 0) {
+            return createNotificationPageButton();
+        }
+
         // Simply use a button with emoji - no complex layered pane
         JButton button = new JButton("🔔") {
             @Override
@@ -4649,6 +4653,229 @@ public class Dashboard extends JFrame {
         });
         
         return button;
+    }
+
+    private JButton createNotificationPageButton() {
+        JButton button = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (getModel().isRollover()) {
+                    g2d.setColor(ACCENT_LIGHT);
+                    g2d.fillOval(2, 2, getWidth() - 4, getHeight() - 4);
+                }
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+
+        ImageIcon icon = loadIconResource("/assets/icons/icon-notification.png", 32, 32);
+        if (icon != null) {
+            button.setIcon(icon);
+        } else {
+            button.setText("!");
+            button.setFont(new Font("Segoe UI", Font.BOLD, 18));
+            button.setForeground(TEXT_DARK);
+        }
+
+        button.setPreferredSize(new Dimension(52, 52));
+        button.setFocusPainted(false);
+        button.setContentAreaFilled(false);
+        button.setOpaque(false);
+        button.setBorderPainted(false);
+        button.setBorder(new EmptyBorder(0, 0, 0, 0));
+        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        button.setToolTipText("Notifikasi");
+        button.addActionListener(e -> showNotifications());
+        return button;
+    }
+
+    private void showNotifications() {
+        resetContent();
+        addTitle("Notifikasi");
+        addDashboardHero(
+                "Pusat Notifikasi",
+                "Pantau request peminjaman, denda, dan aktivitas penting sesuai role akun.");
+
+        JPanel toolbar = createToolbarPanel();
+        JButton refresh = createActionButton("Refresh");
+        JButton markRead = createNeutralButton("Tandai Semua Dibaca");
+        refresh.addActionListener(e -> showNotifications());
+        markRead.addActionListener(e -> {
+            try {
+                com.mycompany.perpustakaan.api.MemberResponse response = libraryApi.markAllNotificationsRead();
+                showResponse(response.isSuccess(), response.getMessage());
+                showNotifications();
+            } catch (SQLException | IllegalStateException exception) {
+                showError("Gagal menandai notifikasi", exception);
+            }
+        });
+        toolbar.add(refresh);
+        toolbar.add(markRead);
+        contentPanel.add(toolbar);
+        contentPanel.add(Box.createVerticalStrut(14));
+
+        JPanel list = createDynamicContentPanel();
+        try {
+            List<com.mycompany.perpustakaan.api.NotificationSummary> notifications = libraryApi.getNotifications(30);
+            int unread = 0;
+            for (com.mycompany.perpustakaan.api.NotificationSummary notification : notifications) {
+                if (!notification.isRead()) {
+                    unread++;
+                }
+            }
+
+            JPanel row = metricRow();
+            row.add(createMetricCard("Total Notifikasi", String.valueOf(notifications.size())));
+            row.add(createMetricCard("Belum Dibaca", String.valueOf(unread)));
+            row.add(createMetricCard("Role", displayRole()));
+            row.add(createMetricCard("Status", unread > 0 ? "Perlu Dicek" : "Bersih"));
+            contentPanel.add(row);
+            contentPanel.add(Box.createVerticalStrut(18));
+
+            if (notifications.isEmpty()) {
+                list.add(createEmptyNotificationCard());
+            } else {
+                for (com.mycompany.perpustakaan.api.NotificationSummary notification : notifications) {
+                    list.add(createNotificationCard(notification));
+                    list.add(Box.createVerticalStrut(10));
+                }
+            }
+        } catch (SQLException | IllegalStateException exception) {
+            list.add(createErrorNotificationCard(exception));
+        }
+
+        contentPanel.add(list);
+        refreshContent();
+    }
+
+    private JPanel createNotificationCard(com.mycompany.perpustakaan.api.NotificationSummary notification) {
+        JPanel card = new RoundedPanel(22, notification.isRead() ? WHITE : ACCENT_LIGHT, CARD_BORDER, 1f);
+        card.setLayout(new BorderLayout(14, 0));
+        card.setBorder(new EmptyBorder(16, 18, 16, 18));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 118));
+
+        JLabel icon = new JLabel(notificationIconLabel(notification.getTipe()));
+        icon.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        icon.setForeground(notification.isRead() ? TEXT_GRAY : ACCENT);
+        icon.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JPanel iconBox = new RoundedPanel(18, WHITE, new Color(255, 222, 210), 1f);
+        iconBox.setPreferredSize(new Dimension(64, 64));
+        iconBox.setLayout(new BorderLayout());
+        iconBox.add(icon, BorderLayout.CENTER);
+
+        JPanel text = new JPanel();
+        text.setOpaque(false);
+        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+
+        JLabel title = new JLabel(safeOrDash(notification.getJudul()));
+        title.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        title.setForeground(TEXT_DARK);
+
+        JLabel message = new JLabel("<html><div style='width:860px;'>"
+                + escapeHtml(safeOrDash(notification.getPesan()))
+                + "</div></html>");
+        message.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        message.setForeground(TEXT_GRAY);
+
+        text.add(title);
+        text.add(Box.createVerticalStrut(6));
+        text.add(message);
+
+        JPanel meta = new JPanel();
+        meta.setOpaque(false);
+        meta.setLayout(new BoxLayout(meta, BoxLayout.Y_AXIS));
+
+        JLabel status = new JLabel(notification.isRead() ? "Dibaca" : "Baru");
+        status.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        status.setForeground(notification.isRead() ? TEXT_GRAY : ACCENT);
+        status.setHorizontalAlignment(SwingConstants.RIGHT);
+
+        JLabel date = new JLabel(safeOrDash(notification.getCreatedAt()));
+        date.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        date.setForeground(TEXT_GRAY);
+        date.setHorizontalAlignment(SwingConstants.RIGHT);
+
+        meta.add(status);
+        meta.add(Box.createVerticalStrut(8));
+        meta.add(date);
+
+        card.add(iconBox, BorderLayout.WEST);
+        card.add(text, BorderLayout.CENTER);
+        card.add(meta, BorderLayout.EAST);
+        return card;
+    }
+
+    private JPanel createEmptyNotificationCard() {
+        JPanel card = new RoundedPanel(24, WHITE, CARD_BORDER, 1f);
+        card.setLayout(new BorderLayout());
+        card.setBorder(new EmptyBorder(28, 24, 28, 24));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 128));
+
+        JLabel title = new JLabel("Belum ada notifikasi");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        title.setForeground(TEXT_DARK);
+
+        JLabel subtitle = new JLabel("Semua aktivitas penting akan muncul di halaman ini.");
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        subtitle.setForeground(TEXT_GRAY);
+
+        JPanel text = new JPanel();
+        text.setOpaque(false);
+        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+        text.add(title);
+        text.add(Box.createVerticalStrut(8));
+        text.add(subtitle);
+        card.add(text, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JPanel createErrorNotificationCard(Exception exception) {
+        JPanel card = new RoundedPanel(24, new Color(255, 245, 245), new Color(255, 205, 210), 1f);
+        card.setLayout(new BorderLayout());
+        card.setBorder(new EmptyBorder(24, 24, 24, 24));
+        card.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 128));
+
+        JLabel title = new JLabel("Gagal memuat notifikasi");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        title.setForeground(RED_STATUS);
+
+        String message = exception.getMessage() == null
+                ? "Periksa koneksi backend atau struktur tabel notifications."
+                : exception.getMessage();
+        JLabel subtitle = new JLabel("<html><div style='width:900px;'>"
+                + escapeHtml(message)
+                + "</div></html>");
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        subtitle.setForeground(TEXT_DARK);
+
+        JPanel text = new JPanel();
+        text.setOpaque(false);
+        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+        text.add(title);
+        text.add(Box.createVerticalStrut(8));
+        text.add(subtitle);
+        card.add(text, BorderLayout.CENTER);
+        return card;
+    }
+
+    private String notificationIconLabel(String type) {
+        String normalized = type == null ? "" : type.toLowerCase();
+        if (normalized.contains("loan") || normalized.contains("pinjam")) {
+            return "LOAN";
+        }
+        if (normalized.contains("fine") || normalized.contains("denda")) {
+            return "FINE";
+        }
+        if (normalized.contains("due") || normalized.contains("tempo")) {
+            return "DUE";
+        }
+        return "INFO";
     }
 
     private JButton createLogoutButton() {
